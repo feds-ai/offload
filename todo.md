@@ -89,3 +89,10 @@
 - [x] All tRPC procedures switched from protectedProcedure to publicProcedure with householdToken auth
 - [x] Onboarding creates household and stores token + memberId in localStorage
 - [x] Shared link (/shared/:token) sets token in localStorage and asks identity if unknown
+
+## Phase 15: Dashboard Layout Redesign
+- [ ] Move load scores and task list to be the primary visible content on dashboard load
+- [ ] Remove InputBar from the top of the dashboard
+- [ ] Add a floating action button (FAB) with a + icon in the bottom-right corner
+- [ ] FAB opens the input modal (text/image/voice) as a bottom sheet or dialog
+- [ ] Quick-add shorthand text field accessible directly from the FAB tap

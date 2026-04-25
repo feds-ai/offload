@@ -8,7 +8,7 @@ import LoadScoreBar from "@/components/LoadScoreBar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Leaf, Share2, Settings, Copy, Check, User } from "lucide-react";
+import { Leaf, Share2, Settings, Copy, Check, User, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -53,8 +53,8 @@ export default function Dashboard() {
   const [view, setView] = useState<TaskView>("household");
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [identityOpen, setIdentityOpen] = useState(false);
+  const [inputOpen, setInputOpen] = useState(false);
 
   // Load household data from token
   const { data: householdData, isLoading: householdLoading } = trpc.household.getByToken.useQuery(
@@ -86,8 +86,8 @@ export default function Dashboard() {
   }, [needsIdentityCheck]);
 
   function handleRefresh() {
-    setRefreshKey((k) => k + 1);
     refetchAll();
+    setInputOpen(false);
   }
 
   function copyShareLink() {
@@ -139,7 +139,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-24">
       {/* Top nav */}
       <header className="sticky top-0 z-30 bg-card/95 backdrop-blur border-b border-border">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -174,12 +174,9 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Load score */}
+      <main className="max-w-2xl mx-auto px-4 py-5 space-y-5">
+        {/* Load score — always visible at the top */}
         <LoadScoreBar />
-
-        {/* Input bar */}
-        <InputBar onTasksAdded={handleRefresh} />
 
         {/* View tabs */}
         <Tabs value={view} onValueChange={(v) => setView(v as TaskView)}>
@@ -264,7 +261,7 @@ export default function Dashboard() {
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {view === "household"
-                    ? "Add something above to get started."
+                    ? "Tap + to add your first task or event."
                     : view === "mine"
                     ? "Your tasks will appear here once added."
                     : "Their tasks will appear here once assigned."}
@@ -275,7 +272,38 @@ export default function Dashboard() {
         </Tabs>
       </main>
 
-      {/* Share dialog */}
+      {/* ── Floating + button ─────────────────────────────────── */}
+      <button
+        onClick={() => setInputOpen(true)}
+        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center"
+        aria-label="Add task or event"
+      >
+        <Plus className="w-6 h-6" strokeWidth={2.5} />
+      </button>
+
+      {/* ── Input bottom sheet ────────────────────────────────── */}
+      <Dialog open={inputOpen} onOpenChange={setInputOpen}>
+        <DialogContent className="sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-t-2xl sm:rounded-2xl">
+          {/* Drag handle for mobile */}
+          <div className="flex justify-center pt-3 pb-1 sm:hidden">
+            <div className="w-10 h-1 rounded-full bg-border" />
+          </div>
+          <div className="flex items-center justify-between px-5 pt-4 pb-2 border-b border-border/50">
+            <h2 className="font-semibold text-foreground">Add to Offload</h2>
+            <button
+              onClick={() => setInputOpen(false)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="px-4 py-4">
+            <InputBar onTasksAdded={handleRefresh} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Share dialog ─────────────────────────────────────── */}
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent>
           <DialogHeader>
