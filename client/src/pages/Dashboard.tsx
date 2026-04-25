@@ -141,32 +141,36 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Top nav */}
-      <header className="sticky top-0 z-30 bg-card/95 backdrop-blur border-b border-border">
+      <header className="sticky top-0 z-30 bg-card/95 backdrop-blur border-b border-border/60">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Leaf className="w-5 h-5 text-primary" />
-            <span className="font-semibold text-foreground">Offload</span>
-            {myMember && (
-              <Badge variant="secondary" className="text-xs">
-                {myMember.displayName}
-              </Badge>
-            )}
+          {/* Brand + identity */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Leaf className="w-4 h-4 text-primary" />
+            </div>
+            <div className="flex flex-col leading-none">
+              <span className="text-sm font-bold text-foreground tracking-tight">Offload</span>
+              {myMember && (
+                <span className="text-xs text-muted-foreground">{myMember.displayName}'s view</span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          {/* Actions */}
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShareOpen(true)}
-              className="text-muted-foreground"
+              className="text-muted-foreground h-8 px-2.5 text-xs gap-1.5"
             >
-              <Share2 className="w-4 h-4" />
-              <span className="hidden sm:inline ml-1.5">Share</span>
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Share</span>
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate("/settings")}
-              className="text-muted-foreground"
+              className="text-muted-foreground h-8 w-8 p-0"
             >
               <Settings className="w-4 h-4" />
             </Button>
@@ -272,13 +276,14 @@ export default function Dashboard() {
         </Tabs>
       </main>
 
-      {/* ── Floating + button ─────────────────────────────────── */}
+      {/* ── Floating pill CTA ─────────────────────────────────── */}
       <button
         onClick={() => setInputOpen(true)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center"
+        className="fixed bottom-6 right-1/2 translate-x-1/2 sm:right-6 sm:translate-x-0 z-40 flex items-center gap-2 px-5 py-3.5 rounded-full bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 active:scale-95 transition-all text-sm font-semibold tracking-wide"
         aria-label="Add task or event"
       >
-        <Plus className="w-6 h-6" strokeWidth={2.5} />
+        <Plus className="w-4 h-4" strokeWidth={2.5} />
+        Offload it
       </button>
 
       {/* ── Input bottom sheet ────────────────────────────────── */}

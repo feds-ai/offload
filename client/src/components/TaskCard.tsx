@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
   CheckCircle2,
+  Circle,
   Clock,
   MoreHorizontal,
   AlertTriangle,
@@ -57,13 +57,19 @@ interface TaskCardProps {
   onRefresh: () => void;
 }
 
-const URGENCY_STYLES = {
-  high: "urgency-high",
-  medium: "urgency-medium",
-  low: "urgency-low",
+const URGENCY_LEFT_BORDER: Record<string, string> = {
+  high: "border-l-red-400",
+  medium: "border-l-amber-400",
+  low: "border-l-transparent",
 };
 
-const URGENCY_LABELS = { high: "Urgent", medium: "Soon", low: "Low" };
+const URGENCY_DOT: Record<string, string> = {
+  high: "bg-red-400",
+  medium: "bg-amber-400",
+  low: "bg-emerald-400",
+};
+
+const URGENCY_LABELS: Record<string, string> = { high: "Urgent", medium: "Soon", low: "Low" };
 
 const CATEGORY_ICONS: Record<string, string> = {
   school: "🎒",
@@ -107,7 +113,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
   });
 
   const deleteTask = trpc.tasks.delete.useMutation({
-    onSuccess: (_, vars) => {
+    onSuccess: () => {
       utils.tasks.list.invalidate();
       utils.tasks.listMine.invalidate();
       utils.load.scores.invalidate();
@@ -124,32 +130,21 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
   const ownerMember = members.find((m) => m.id === task.ownerMemberId);
   const otherMember = members.find((m) => m.id !== task.ownerMemberId);
   const deadlineStr = formatDeadline(task.deadline);
-  const isOverdue = task.deadline && isPast(new Date(task.deadline)) && task.status === "open";
+  const isOverdue =
+    task.deadline && isPast(new Date(task.deadline)) && task.status === "open";
 
   async function markDone() {
-    await updateTask.mutateAsync({
-      taskId: task.id,
-      token: token ?? "",
-      status: "done",
-    });
-    toast.success("Task marked as done ✓");
+    await updateTask.mutateAsync({ taskId: task.id, token: token ?? "", status: "done" });
+    toast.success("Done ✓");
   }
 
   async function markOpen() {
-    await updateTask.mutateAsync({
-      taskId: task.id,
-      token: token ?? "",
-      status: "open",
-    });
+    await updateTask.mutateAsync({ taskId: task.id, token: token ?? "", status: "open" });
   }
 
   async function snooze() {
-    await updateTask.mutateAsync({
-      taskId: task.id,
-      token: token ?? "",
-      status: "snoozed",
-    });
-    toast.success("Task snoozed — it'll come back soon");
+    await updateTask.mutateAsync({ taskId: task.id, token: token ?? "", status: "snoozed" });
+    toast.success("Snoozed — it'll come back soon");
   }
 
   async function reassign() {
@@ -185,7 +180,6 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
 
   async function handleDelete() {
     await deleteTask.mutateAsync({ taskId: task.id, token: token ?? "" });
-    // Learn from deletion: if this was an inferred task type, dismiss it
     const inferenceKey = `${task.category}:${task.subject ?? "any"}`;
     const alreadyDismissed = (dismissedTypes ?? []).some(
       (d: any) => d.inferenceType === inferenceKey
@@ -198,11 +192,10 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
           label: task.title,
         });
         toast(
-          `Got it — I won't suggest tasks like "${task.title}" again. You can re-enable this in Settings.`,
+          `Got it — I won't suggest tasks like "${task.title}" again. Re-enable in Settings.`,
           { duration: 5000 }
         );
       } catch {
-        // Dismissal is best-effort; don't block the delete
         toast.success("Task removed");
       }
     } else {
@@ -210,113 +203,134 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
     }
   }
 
+  const isDone = task.status === "done";
+
   return (
     <>
-      <Card
-        className={`shadow-none border transition-all duration-200 ${
-          task.status === "done"
-            ? "opacity-60 bg-muted/30"
-            : isOverdue
-            ? "border-orange-200 bg-orange-50/30"
-            : "bg-card hover:shadow-sm"
-        }`}
+      <div
+        className={`
+          group relative bg-card rounded-xl border-l-4 border border-border
+          transition-all duration-200
+          ${isDone ? "opacity-50" : "hover:shadow-sm hover:-translate-y-px"}
+          ${isOverdue && !isDone ? "border-orange-200 bg-orange-50/20" : ""}
+          ${URGENCY_LEFT_BORDER[task.urgency]}
+        `}
       >
-        <CardContent className="py-3 px-4">
-          <div className="flex items-start gap-3">
-            {/* Done toggle */}
-            <button
-              onClick={task.status === "done" ? markOpen : markDone}
-              className={`mt-0.5 shrink-0 transition-colors ${
-                task.status === "done" ? "text-primary" : "text-muted-foreground hover:text-primary"
-              }`}
-              aria-label={task.status === "done" ? "Mark as open" : "Mark as done"}
-            >
+        <div className="flex items-start gap-3 px-4 py-3">
+          {/* Check button */}
+          <button
+            onClick={isDone ? markOpen : markDone}
+            className={`mt-0.5 shrink-0 transition-colors ${
+              isDone
+                ? "text-primary"
+                : "text-muted-foreground/40 hover:text-primary"
+            }`}
+            aria-label={isDone ? "Mark as open" : "Mark as done"}
+          >
+            {isDone ? (
               <CheckCircle2 className="w-5 h-5" />
-            </button>
+            ) : (
+              <Circle className="w-5 h-5" />
+            )}
+          </button>
 
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <p
-                  className={`text-sm font-medium leading-snug ${
-                    task.status === "done" ? "line-through text-muted-foreground" : "text-foreground"
-                  }`}
-                >
-                  {CATEGORY_ICONS[task.category] ?? "✅"} {task.title}
-                  {task.lowConfidence && (
-                    <span className="ml-1.5 inline-flex items-center text-amber-500" title="Review this task">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                    </span>
-                  )}
-                  {task.isRecurring && (
-                    <span className="ml-1.5 text-muted-foreground" title="Recurring">
-                      <RotateCcw className="w-3 h-3 inline" />
-                    </span>
-                  )}
-                </p>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="shrink-0 text-muted-foreground hover:text-foreground p-0.5 rounded">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                      <Pencil className="w-4 h-4 mr-2" /> Edit
-                    </DropdownMenuItem>
-                    {task.status !== "done" && (
-                      <DropdownMenuItem onClick={snooze}>
-                        <Clock className="w-4 h-4 mr-2" /> Snooze
-                      </DropdownMenuItem>
-                    )}
-                    {task.urgency !== "high" && task.status === "open" && (
-                      <DropdownMenuItem onClick={setUrgencyHigh}>
-                        <Zap className="w-4 h-4 mr-2" /> Mark as urgent
-                      </DropdownMenuItem>
-                    )}
-                    {otherMember && task.status !== "done" && (
-                      <DropdownMenuItem onClick={reassign}>
-                        <UserCheck className="w-4 h-4 mr-2" /> Reassign to {otherMember.displayName}
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={handleDelete}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              {/* Meta row */}
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <Badge
-                  variant="outline"
-                  className={`text-xs px-1.5 py-0 h-5 ${URGENCY_STYLES[task.urgency]}`}
-                >
-                  {URGENCY_LABELS[task.urgency]}
-                </Badge>
-                {deadlineStr && (
+          {/* Main content */}
+          <div className="flex-1 min-w-0">
+            {/* Title row */}
+            <div className="flex items-start justify-between gap-2">
+              <p
+                className={`text-sm font-medium leading-snug ${
+                  isDone ? "line-through text-muted-foreground" : "text-foreground"
+                }`}
+              >
+                <span className="mr-1.5">{CATEGORY_ICONS[task.category] ?? "✅"}</span>
+                {task.title}
+                {task.lowConfidence && (
                   <span
-                    className={`text-xs flex items-center gap-0.5 ${
-                      isOverdue ? "text-orange-600 font-medium" : "text-muted-foreground"
-                    }`}
+                    className="ml-1.5 inline-flex items-center text-amber-500"
+                    title="AI wasn't fully confident — worth reviewing"
                   >
-                    <Calendar className="w-3 h-3" />
-                    {deadlineStr}
+                    <AlertTriangle className="w-3.5 h-3.5" />
                   </span>
                 )}
-                {ownerMember && (
-                  <span className="text-xs text-muted-foreground">→ {ownerMember.displayName}</span>
+                {task.isRecurring && (
+                  <span className="ml-1.5 text-muted-foreground" title="Recurring">
+                    <RotateCcw className="w-3 h-3 inline" />
+                  </span>
                 )}
-              </div>
+              </p>
+
+              {/* Actions menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="shrink-0 text-muted-foreground/40 hover:text-foreground p-0.5 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                    <Pencil className="w-4 h-4 mr-2" /> Edit
+                  </DropdownMenuItem>
+                  {task.status !== "done" && (
+                    <DropdownMenuItem onClick={snooze}>
+                      <Clock className="w-4 h-4 mr-2" /> Snooze
+                    </DropdownMenuItem>
+                  )}
+                  {task.urgency !== "high" && task.status === "open" && (
+                    <DropdownMenuItem onClick={setUrgencyHigh}>
+                      <Zap className="w-4 h-4 mr-2" /> Mark as urgent
+                    </DropdownMenuItem>
+                  )}
+                  {otherMember && task.status !== "done" && (
+                    <DropdownMenuItem onClick={reassign}>
+                      <UserCheck className="w-4 h-4 mr-2" /> Reassign to {otherMember.displayName}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleDelete}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Meta row */}
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              {/* Urgency dot + label */}
+              {task.urgency !== "low" && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <span className={`w-1.5 h-1.5 rounded-full ${URGENCY_DOT[task.urgency]}`} />
+                  {URGENCY_LABELS[task.urgency]}
+                </span>
+              )}
+
+              {/* Deadline */}
+              {deadlineStr && (
+                <span
+                  className={`text-xs flex items-center gap-1 ${
+                    isOverdue && !isDone
+                      ? "text-orange-600 font-medium"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  <Calendar className="w-3 h-3" />
+                  {deadlineStr}
+                </span>
+              )}
+
+              {/* Owner chip */}
+              {ownerMember && (
+                <span className="ml-auto text-xs text-muted-foreground/70 font-medium">
+                  {ownerMember.displayName}
+                </span>
+              )}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Edit dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

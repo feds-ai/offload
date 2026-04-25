@@ -91,8 +91,15 @@
 - [x] Shared link (/shared/:token) sets token in localStorage and asks identity if unknown
 
 ## Phase 15: Dashboard Layout Redesign
-- [ ] Move load scores and task list to be the primary visible content on dashboard load
-- [ ] Remove InputBar from the top of the dashboard
-- [ ] Add a floating action button (FAB) with a + icon in the bottom-right corner
-- [ ] FAB opens the input modal (text/image/voice) as a bottom sheet or dialog
-- [ ] Quick-add shorthand text field accessible directly from the FAB tap
+- [x] Move load scores and task list to be the primary visible content on dashboard load
+- [x] Remove InputBar from the top of the dashboard
+- [x] Add a floating action button (FAB) with a + icon in the bottom-right corner
+- [x] FAB opens the input modal (text/image/voice) as a bottom sheet or dialog
+- [x] Quick-add shorthand text field accessible directly from the FAB tap
+
+## Phase 16: Visual Design Polish
+- [ ] Replace plain circular FAB with a labelled pill CTA button (e.g. "+ Offload it")
+- [ ] Improve LoadScoreBar visual design with richer layout
+- [ ] Improve TaskCard visual design with better hierarchy and colour accents
+- [ ] Improve Dashboard header with subtle branding
+- [ ] Improve overall colour use and spacing for a more crafted feel
