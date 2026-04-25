@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `events` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`householdId` int NOT NULL,\n\t`title` varchar(512) NOT NULL,\n\t`description` text,\n\t`location` varchar(512),\n\t`startTime` timestamp NULL,\n\t`endTime` timestamp NULL,\n\t`subjectName` varchar(128),\n\t`googleEventIdPrimary` varchar(256),\n\t`googleEventIdPartner` varchar(256),\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `events_id` PRIMARY KEY(`id`)\n)",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway06.us-east-1.prod.aws.tidbcloud.com --port 4000 --user owoww2ojSUL2sER.root --database 4TRGCQYaVyQAFXCPnu8SeD --execute CREATE TABLE `events` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`householdId` int NOT NULL,\n\t`title` varchar(512) NOT NULL,\n\t`description` text,\n\t`location` varchar(512),\n\t`startTime` timestamp NULL,\n\t`endTime` timestamp NULL,\n\t`subjectName` varchar(128),\n\t`googleEventIdPrimary` varchar(256),\n\t`googleEventIdPartner` varchar(256),\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `events_id` PRIMARY KEY(`id`)\n)",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1743
+}

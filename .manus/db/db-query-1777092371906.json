@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `dismissed_inference_types` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`householdId` int NOT NULL,\n\t`inferenceType` varchar(128) NOT NULL,\n\t`label` varchar(255) NOT NULL,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `dismissed_inference_types_id` PRIMARY KEY(`id`)\n)",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway06.us-east-1.prod.aws.tidbcloud.com --port 4000 --user owoww2ojSUL2sER.root --database 4TRGCQYaVyQAFXCPnu8SeD --execute CREATE TABLE `dismissed_inference_types` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`householdId` int NOT NULL,\n\t`inferenceType` varchar(128) NOT NULL,\n\t`label` varchar(255) NOT NULL,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `dismissed_inference_types_id` PRIMARY KEY(`id`)\n)",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 2544
+}
