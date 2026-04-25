@@ -150,3 +150,10 @@
 - [x] Plants: make plant SVG bigger inside the growth rings
 - [x] Fix: when deadline is not specified on a task, show no deadline in the edit view (not a default date)
 - [x] Fix load balance: only show imbalance nudge when total tasks >= 4 AND one person has 2x+ the other's tasks (not 1 vs 0)
+
+## Phase 24: Modal Review Clarity
+- [x] TaskProcessingModal: make event vs task classification visually unmistakable — distinct headers, icons, colours, and a summary line at the top ("1 event · 2 tasks extracted")
+- [x] Add a "Move to tasks" / "Move to calendar" toggle on each item so users can correct the AI classification before saving
+
+## Phase 25: Modal Reclassification
+- [x] Add per-item reclassification in TaskProcessingModal: event cards get "Move to tasks" button; task cards get "Move to calendar" button, with state updates so corrected items save to the right destination

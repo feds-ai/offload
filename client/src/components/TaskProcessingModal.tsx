@@ -90,12 +90,21 @@ export default function TaskProcessingModal({
   const [saving, setSaving] = useState(false);
   // Editable event fields (title, startTime, location)
   const [eventEdits, setEventEdits] = useState<Record<number, Partial<ExtractedEvent>>>({});
+  // Reclassification: event indices moved to tasks, task indices moved to events
+  const [movedToTask, setMovedToTask] = useState<Set<number>>(new Set());
+  const [movedToEvent, setMovedToEvent] = useState<Set<number>>(new Set());
 
   function getEvent(i: number): ExtractedEvent {
     return { ...(result?.events[i] ?? {} as ExtractedEvent), ...(eventEdits[i] ?? {}) };
   }
   function patchEvent(i: number, patch: Partial<ExtractedEvent>) {
     setEventEdits((prev) => ({ ...prev, [i]: { ...(prev[i] ?? {}), ...patch } }));
+  }
+  function moveEventToTask(i: number) {
+    setMovedToTask((prev) => { const s = new Set(prev); s.add(i); return s; });
+  }
+  function moveTaskToEvent(i: number) {
+    setMovedToEvent((prev) => { const s = new Set(prev); s.add(i); return s; });
   }
 
   const primaryMember = members.find((m) => m.role === "primary");
@@ -169,9 +178,10 @@ export default function TaskProcessingModal({
     if (!token || !result) return;
     setSaving(true);
     try {
-      // Save events (use edited versions)
+      // Save events (use edited versions, skip ones reclassified as tasks)
       const savedEvents: Array<{ id: number; title: string }> = [];
       for (let ei = 0; ei < result!.events.length; ei++) {
+        if (movedToTask.has(ei)) continue; // reclassified — save as task below
         const ev = getEvent(ei);
         const saved = await createEvent.mutateAsync({
           token,
@@ -185,9 +195,23 @@ export default function TaskProcessingModal({
         if (saved) savedEvents.push({ id: saved.id, title: ev.title });
       }
 
+      // Save events that were reclassified from tasks
+      for (let i = 0; i < result!.tasks.length; i++) {
+        if (!movedToEvent.has(i)) continue;
+        const task = result!.tasks[i];
+        const saved = await createEvent.mutateAsync({
+          token,
+          title: task.title,
+          description: task.description,
+          startTime: task.deadline,
+        });
+        if (saved) savedEvents.push({ id: saved.id, title: task.title });
+      }
+
       // Save active tasks
       for (let i = 0; i < result!.tasks.length; i++) {
         if (removedTasks.has(i)) continue;
+        if (movedToEvent.has(i)) continue; // reclassified — already saved as event above
         const task = result!.tasks[i];
         const ownerId = getOwner(i, task);
         const isRecurring = taskRecurring[i] ?? false;
@@ -237,11 +261,31 @@ export default function TaskProcessingModal({
         }
       }
 
+      // Save events reclassified as tasks
+      for (let ei = 0; ei < result!.events.length; ei++) {
+        if (!movedToTask.has(ei)) continue;
+        const ev = getEvent(ei);
+        await createTask.mutateAsync({
+          token,
+          title: ev.title,
+          description: ev.description,
+          category: "general",
+          subject: "any",
+          ownerMemberId: primaryMember?.id ?? myMemberId ?? members[0]?.id ?? 0,
+          urgency: "medium",
+          isRecurringSuggestion: false,
+          isRecurring: false,
+          lowConfidence: true,
+        });
+      }
+
       utils.tasks.list.invalidate();
       utils.tasks.listMine.invalidate();
       utils.load.scores.invalidate();
       utils.routing.getRules.invalidate();
-      toast.success(`Saved ${result!.events.length} event(s) and ${activeTasks.length} task(s)`);
+      const totalEvents = result!.events.length - movedToTask.size + movedToEvent.size;
+      const totalTasks = activeTasks.length - movedToEvent.size + movedToTask.size;
+      toast.success(`Saved ${totalEvents} event(s) and ${totalTasks} task(s)`);
       onConfirm();
     } catch (e: any) {
       toast.error(e.message ?? "Failed to save");
@@ -272,6 +316,28 @@ export default function TaskProcessingModal({
 
         <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[calc(90vh-8rem)]">
 
+        {/* Classification summary banner */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {result.events.length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
+              <Calendar className="w-3.5 h-3.5" />
+              {result.events.length} calendar {result.events.length === 1 ? "event" : "events"}
+            </div>
+          )}
+          {result.tasks.length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {result.tasks.length} {result.tasks.length === 1 ? "task" : "tasks"}
+            </div>
+          )}
+          {result.events.length === 0 && result.tasks.length === 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted border border-border text-muted-foreground text-xs">
+              Nothing extracted — try rephrasing
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground ml-auto">Review and edit before saving</p>
+        </div>
+
         {/* Transcript (voice only) */}
         {result.transcript && (
           <div className="bg-muted/40 rounded-xl px-3.5 py-2.5 text-xs text-muted-foreground italic border border-border/40 flex gap-2 items-start">
@@ -283,17 +349,23 @@ export default function TaskProcessingModal({
         {/* Events */}
         {result.events.length > 0 && (
           <div className="space-y-2">
-            <div className="section-label">
-              <Calendar className="w-3 h-3" />
-              Events · both calendars
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50/80 border border-blue-200/60">
+              <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-blue-800 leading-none">Calendar Events</p>
+                <p className="text-[10px] text-blue-600 mt-0.5">Added to your household calendar</p>
+              </div>
             </div>
             {result.events.map((_, i) => {
+              if (movedToTask.has(i)) return null;
               const ev = getEvent(i);
               return (
-                <div key={i} className="card-glass rounded-xl border-primary/20 bg-primary/5">
+                <div key={i} className="card-glass rounded-xl border-blue-200/50 bg-blue-50/30">
                   <div className="py-3 px-4 space-y-2">
                     <div className="flex items-start gap-2">
-                      <Calendar className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                      <Calendar className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <Input
                           value={ev.title}
@@ -305,6 +377,13 @@ export default function TaskProcessingModal({
                           <p className="text-xs text-muted-foreground">For: {ev.subjectName}</p>
                         )}
                       </div>
+                      <button
+                        onClick={() => moveEventToTask(i)}
+                        className="text-[10px] text-blue-500 hover:text-blue-700 border border-blue-200 hover:border-blue-400 px-2 py-1 rounded-lg shrink-0 transition-colors"
+                        title="Move to tasks instead"
+                      >
+                        → Task
+                      </button>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
@@ -357,12 +436,21 @@ export default function TaskProcessingModal({
         {/* Tasks */}
         {result.tasks.length > 0 && (
           <div className="space-y-2">
-            <div className="section-label">
-              <CheckCircle2 className="w-3 h-3" />
-              Tasks · {activeTasks.length} active
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50/80 border border-emerald-200/60">
+              <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-bold text-emerald-800 leading-none">Action Tasks</p>
+                <p className="text-[10px] text-emerald-600 mt-0.5">Assigned to household members</p>
+              </div>
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                {activeTasks.length} active
+              </span>
             </div>
             {result.tasks.map((task, i) => {
               if (removedTasks.has(i)) return null;
+              if (movedToEvent.has(i)) return null;
               const expanded = expandedTasks.has(i);
               const ownerId = getOwner(i, task);
               const owner = members.find((m) => m.id === ownerId);
@@ -391,6 +479,13 @@ export default function TaskProcessingModal({
                             )}
                           </p>
                           <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => moveTaskToEvent(i)}
+                              className="text-[10px] text-emerald-600 hover:text-emerald-800 border border-emerald-200 hover:border-emerald-400 px-1.5 py-0.5 rounded-lg transition-colors"
+                              title="Move to calendar instead"
+                            >
+                              → Cal
+                            </button>
                             <button
                               onClick={() => toggleExpand(i)}
                               className="text-muted-foreground hover:text-foreground p-0.5"
