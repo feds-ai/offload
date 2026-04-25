@@ -88,6 +88,15 @@ export default function TaskProcessingModal({
   const [taskRecurring, setTaskRecurring] = useState<Record<number, boolean>>({});
   const [showPresents, setShowPresents] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Editable event fields (title, startTime, location)
+  const [eventEdits, setEventEdits] = useState<Record<number, Partial<ExtractedEvent>>>({});
+
+  function getEvent(i: number): ExtractedEvent {
+    return { ...(result?.events[i] ?? {} as ExtractedEvent), ...(eventEdits[i] ?? {}) };
+  }
+  function patchEvent(i: number, patch: Partial<ExtractedEvent>) {
+    setEventEdits((prev) => ({ ...prev, [i]: { ...(prev[i] ?? {}), ...patch } }));
+  }
 
   const primaryMember = members.find((m) => m.role === "primary");
   const partnerMember = members.find((m) => m.role === "partner");
@@ -160,9 +169,10 @@ export default function TaskProcessingModal({
     if (!token || !result) return;
     setSaving(true);
     try {
-      // Save events
+      // Save events (use edited versions)
       const savedEvents: Array<{ id: number; title: string }> = [];
-      for (const ev of result!.events) {
+      for (let ei = 0; ei < result!.events.length; ei++) {
+        const ev = getEvent(ei);
         const saved = await createEvent.mutateAsync({
           token,
           title: ev.title,
@@ -277,33 +287,49 @@ export default function TaskProcessingModal({
               <Calendar className="w-3 h-3" />
               Events · both calendars
             </div>
-            {result.events.map((ev, i) => (
-              <div key={i} className="card-glass rounded-xl border-primary/20 bg-primary/5">
-                <div className="py-3 px-4">
-                  <div className="flex items-start gap-2">
-                    <Calendar className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">{ev.title}</p>
-                      {ev.startTime && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {new Date(ev.startTime).toLocaleString(undefined, {
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                          {ev.location ? ` · ${ev.location}` : ""}
-                        </p>
-                      )}
-                      {ev.subjectName && (
-                        <p className="text-xs text-muted-foreground">For: {ev.subjectName}</p>
-                      )}
+            {result.events.map((_, i) => {
+              const ev = getEvent(i);
+              return (
+                <div key={i} className="card-glass rounded-xl border-primary/20 bg-primary/5">
+                  <div className="py-3 px-4 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <Calendar className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <Input
+                          value={ev.title}
+                          onChange={(e) => patchEvent(i, { title: e.target.value })}
+                          className="h-7 text-sm font-medium border-0 bg-transparent px-0 py-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                          placeholder="Event title"
+                        />
+                        {ev.subjectName && (
+                          <p className="text-xs text-muted-foreground">For: {ev.subjectName}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Date &amp; time</label>
+                        <Input
+                          type="datetime-local"
+                          value={ev.startTime ? ev.startTime.slice(0, 16) : ""}
+                          onChange={(e) => patchEvent(i, { startTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                          className="h-7 text-xs mt-0.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Location</label>
+                        <Input
+                          value={ev.location ?? ""}
+                          onChange={(e) => patchEvent(i, { location: e.target.value || undefined })}
+                          placeholder="optional"
+                          className="h-7 text-xs mt-0.5"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

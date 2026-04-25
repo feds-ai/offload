@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   computeLoadScore,
   createEvent,
+  deleteEvent,
   createHousehold,
   createHouseholdMember,
   createRoutingRule,
@@ -620,9 +621,19 @@ export const appRouter = router({
         }
         return event;
       }),
+    delete: publicProcedure
+      .input(z.object({ token: z.string(), eventId: z.number() }))
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const allEvents = await getEventsByHousehold(household.id);
+        if (!allEvents.find((e) => e.id === input.eventId)) {
+          throw new TRPCError({ code: "NOT_FOUND" });
+        }
+        await deleteEvent(input.eventId);
+        return { success: true };
+      }),
   }),
-
-  // ─── Load scores ───────────────────────────────────────────────────────────
+  // ─── Load scoress ───────────────────────────────────────────────────────────
 
   load: router({
     scores: publicProcedure
@@ -640,12 +651,21 @@ export const appRouter = router({
         });
 
         const totalScore = scores.reduce((s, m) => s + m.score, 0);
+        const totalOpenTasks = scores.reduce((s, m) => s + m.openCount, 0);
         const threshold = household.imbalanceThreshold ?? 0.6;
-
         let imbalanced = false;
-        if (totalScore > 0 && scores.length === 2) {
+        // Only flag imbalance when:
+        //  1. There are at least 4 open tasks total (avoids false positives on tiny loads)
+        //  2. The heavier person has at least 2× the lighter person's task count
+        //  3. The score ratio exceeds the household threshold
+        if (totalScore > 0 && scores.length === 2 && totalOpenTasks >= 4) {
           const maxScore = Math.max(...scores.map((s) => s.score));
-          imbalanced = maxScore / totalScore >= threshold;
+          const [s0, s1] = scores;
+          const heavierCount = Math.max(s0?.openCount ?? 0, s1?.openCount ?? 0);
+          const lighterCount = Math.min(s0?.openCount ?? 0, s1?.openCount ?? 0);
+          // Heavier must have at least 2x the lighter (lighterCount=0 → always 2x if heavier>0)
+          const twoXRatio = lighterCount === 0 ? heavierCount >= 2 : heavierCount >= lighterCount * 2;
+          imbalanced = maxScore / totalScore >= threshold && twoXRatio;
         }
 
         return { scores, totalScore, imbalanced, threshold };

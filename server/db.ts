@@ -369,6 +369,12 @@ export async function updateTask(
   await db.update(tasks).set(data).where(eq(tasks.id, taskId));
 }
 
+export async function deleteEvent(eventId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.delete(events).where(eq(events.id, eventId));
+}
+
 export async function deleteTask(taskId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");

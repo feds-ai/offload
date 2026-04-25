@@ -41,8 +41,8 @@ function PlantSVG({ load, color }: { load: number; color: string }) {
   return (
     <svg
       viewBox="0 0 48 48"
-      width="28"
-      height="28"
+      width="40"
+      height="40"
       style={{ opacity, transition: "all 0.8s ease-out" }}
       aria-hidden
     >

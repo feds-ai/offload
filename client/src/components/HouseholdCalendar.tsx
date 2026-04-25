@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useHousehold } from "@/contexts/HouseholdContext";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, CalendarDays, Repeat2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Repeat2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -143,12 +144,30 @@ export default function HouseholdCalendar() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const selectedEvents = selectedDay ? eventsOnDay(selectedDay) : [];
 
-  // ─── Upcoming events list (next 14 days) ─────────────────────────────────
+  // ─── Delete event mutation ────────────────────────────────────────────────
+  const utils = trpc.useUtils();
+  const deleteEventMutation = trpc.events.delete.useMutation({
+    onSuccess: () => {
+      utils.events.list.invalidate();
+      toast.success("Event removed");
+      // Clear selected day if it now has no events
+      if (selectedDay) {
+        const remaining = eventsOnDay(selectedDay).filter(
+          (ev) => !ev.isRecurring
+        );
+        if (remaining.length <= 1) setSelectedDay(null);
+      }
+    },
+    onError: () => toast.error("Failed to remove event"),
+  });
+
+  // ─── Upcoming events list (next 14 days, one-off only) ───────────────────
 
   const upcoming = useMemo(() => {
     const now = new Date();
     const twoWeeks = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-    return calendarEvents.filter((ev) => ev.date >= now && ev.date <= twoWeeks);
+    // Only show one-off events in upcoming list — rhythm is too noisy
+    return calendarEvents.filter((ev) => !ev.isRecurring && ev.date >= now && ev.date <= twoWeeks);
   }, [calendarEvents]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -251,7 +270,12 @@ export default function HouseholdCalendar() {
           ) : (
             <div className="space-y-2">
               {selectedEvents.map((ev) => (
-                <EventRow key={ev.id} ev={ev} members={members} />
+                <EventRow
+                  key={ev.id}
+                  ev={ev}
+                  members={members}
+                  onDelete={(id) => deleteEventMutation.mutate({ token: token ?? "", eventId: id })}
+                />
               ))}
             </div>
           )}
@@ -267,7 +291,12 @@ export default function HouseholdCalendar() {
           </div>
           <div className="space-y-2">
             {upcoming.map((ev) => (
-              <EventRow key={ev.id} ev={ev} members={members} />
+              <EventRow
+                key={ev.id}
+                ev={ev}
+                members={members}
+                onDelete={(id) => deleteEventMutation.mutate({ token: token ?? "", eventId: id })}
+              />
             ))}
           </div>
         </div>
@@ -290,13 +319,21 @@ export default function HouseholdCalendar() {
 
 // ─── EventRow ─────────────────────────────────────────────────────────────────
 
-function EventRow({ ev, members }: { ev: CalendarEvent; members: Array<{ id: number; displayName: string; role: string }> }) {
+function EventRow({
+  ev,
+  members,
+  onDelete,
+}: {
+  ev: CalendarEvent;
+  members: Array<{ id: number; displayName: string; role: string }>;
+  onDelete?: (id: number) => void;
+}) {
   const personLabel = ev.person
     ? members.find((m) => m.role === ev.person)?.displayName ?? ev.person
     : undefined;
 
   return (
-    <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/50 border border-border/30">
+      <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/50 border border-border/30 group">
       <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
         ev.isRecurring ? "bg-teal-50 text-teal-600" : "bg-primary/10 text-primary"
       }`}>
@@ -327,6 +364,15 @@ function EventRow({ ev, members }: { ev: CalendarEvent; members: Array<{ id: num
           )}
         </div>
       </div>
+      {onDelete && !ev.isRecurring && (
+        <button
+          onClick={() => onDelete(Number(ev.id.replace("ev-", "")))}
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 shrink-0"
+          title="Remove event"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   );
 }

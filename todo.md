@@ -142,3 +142,11 @@
 - [x] Plant SVG inside each ring perks up (tall, vibrant) when load is lighter, droops (bent, muted) when heavier
 - [x] Always-visible warm sentence: affirming when balanced, names heavier person when not
 - [x] Remove all percentage numbers from LoadScoreBar
+
+## Phase 23: Bug Fixes & Improvements
+- [x] Calendar: add delete button to one-off events; hide weekly rhythm entries from "Next 14 days" upcoming list (too noisy)
+- [x] After offloading: prompt user to review/edit the result and optionally add extra tasks
+- [x] Fix: offloaded events not being added to the household calendar
+- [x] Plants: make plant SVG bigger inside the growth rings
+- [x] Fix: when deadline is not specified on a task, show no deadline in the edit view (not a default date)
+- [x] Fix load balance: only show imbalance nudge when total tasks >= 4 AND one person has 2x+ the other's tasks (not 1 vs 0)

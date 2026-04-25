@@ -383,12 +383,27 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
               <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Deadline</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Deadline</label>
+                {editDeadline && (
+                  <button
+                    type="button"
+                    onClick={() => setEditDeadline("")}
+                    className="text-xs text-muted-foreground hover:text-foreground underline"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               <Input
                 type="date"
                 value={editDeadline}
                 onChange={(e) => setEditDeadline(e.target.value)}
+                placeholder="No deadline"
               />
+              {!editDeadline && (
+                <p className="text-xs text-muted-foreground">No deadline set</p>
+              )}
             </div>
           </div>
           <DialogFooter>

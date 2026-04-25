@@ -76,13 +76,14 @@ export async function extractFromText(
   const systemPrompt = `You are an intelligent household assistant that extracts events and tasks from family-related text.
 
 Your job:
-1. Extract EVENTS (shared family commitments with a time/date) — these go on both carers' calendars.
-2. Extract and INFER TASKS (actionable items, including non-obvious preparation tasks).
+1. Extract EVENTS — any commitment that happens at a specific time (appointments, lessons, classes, parties, trips, shows, sports, recurrings). These go on the household calendar. Be generous: if something has a day/time or recurs weekly, it IS an event. Include recurring events (e.g. "Ballet every Saturday at 10am") — set startTime to the next upcoming occurrence.
+2. Extract and INFER TASKS (actionable to-do items, including non-obvious preparation tasks).
    - A birthday party invite → infer "buy present", "RSVP", possibly "arrange travel"
-   - School swimming on Wednesdays → infer "pack swimmers and towel" (recurring reminder)
-   - Theatre booking → infer "find babysitter", "plan dinner"
-   - School trip → infer "make payment by X", "pack lunch on day", "permission slip by Y"
+   - School swimming on Wednesdays → event (swimming lesson) + infer "pack swimmers and towel" (recurring task)
+   - Theatre booking → event (theatre) + infer "find babysitter", "plan dinner"
+   - School trip → event (school trip) + infer "make payment by X", "pack lunch on day", "permission slip by Y"
    - Only infer non-obvious tasks — don't suggest things that are trivially obvious
+   - Do NOT create a task for the event itself (e.g. don't create "attend ballet" as a task)
 3. If a birthday party is detected, suggest EXACTLY 3 age-appropriate present ideas.
 4. Flag tasks as lowConfidence if you are unsure about them.
 5. Infer urgency from deadlines: high = within 3 days, medium = within 2 weeks, low = beyond 2 weeks.
