@@ -118,3 +118,21 @@
 
 ## Phase 19: Bug Fixes
 - [x] Fix dismissal learning: "won't suggest again" toast should only fire after 3+ deletions of the same task type, not on first deletion
+
+## Phase 20: Bug Fixes
+- [ ] Fix routing rules not saving — tasks offloaded but no rules appear in Settings
+- [ ] Fix category/domain assignment not being asked during task processing
+
+## Phase 21: Enhancements
+- [ ] Add task completion celebration/nudge (confetti or warm toast) when a task is marked done
+- [ ] Add imbalance motivational sentence on Dashboard when load is unbalanced
+- [ ] Add profile picture upload for household members (avatar in Settings + member chips)
+- [ ] Add Household Calendar tab showing all events and recurring rhythm items
+- [ ] Add small category icon to each TaskCard (visible in card header/meta row)
+
+## Phase 21: Enhancements (from user request)
+- [x] Task completion celebration nudge (warm toast with emoji)
+- [x] Imbalance motivational sentence in LoadScoreBar (rotating messages)
+- [x] Profile picture upload for household members (Settings + LoadScoreBar + TaskCard owner chip)
+- [x] Household Calendar tab in Dashboard (one-off events + weekly rhythm entries)
+- [x] Category icon + label badge on each TaskCard

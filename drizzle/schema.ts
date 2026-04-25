@@ -47,6 +47,7 @@ export const householdMembers = mysqlTable("household_members", {
   displayName: varchar("displayName", { length: 128 }).notNull(),
   role: mysqlEnum("role", ["primary", "partner"]).default("primary").notNull(),
   googleCalendarToken: text("googleCalendarToken"), // encrypted JSON
+  avatarUrl: text("avatarUrl"), // S3 storage URL for profile picture
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

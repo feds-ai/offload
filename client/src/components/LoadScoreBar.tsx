@@ -168,8 +168,12 @@ export default function LoadScoreBar() {
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="relative w-12 h-12 shrink-0">
                 <AvatarRing pct={primaryPct} color={primaryColor} size={48} />
-                <div className="absolute inset-1.5 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold">
-                  {primary ? initials(primary.member.displayName) : "?"}
+                <div className="absolute inset-1.5 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold overflow-hidden">
+                  {(primary?.member as any)?.avatarUrl ? (
+                    <img src={(primary?.member as any).avatarUrl} alt={primary?.member.displayName} className="w-full h-full object-cover" />
+                  ) : (
+                    primary ? initials(primary.member.displayName) : "?"
+                  )}
                 </div>
               </div>
               <div className="min-w-0">
@@ -199,8 +203,12 @@ export default function LoadScoreBar() {
             <div className="flex items-center gap-3 flex-1 min-w-0 flex-row-reverse">
               <div className="relative w-12 h-12 shrink-0">
                 <AvatarRing pct={partnerPct} color={partnerColor} size={48} />
-                <div className="absolute inset-1.5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-xs font-bold">
-                  {partner ? initials(partner.member.displayName) : "?"}
+                <div className="absolute inset-1.5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-xs font-bold overflow-hidden">
+                  {(partner?.member as any)?.avatarUrl ? (
+                    <img src={(partner?.member as any).avatarUrl} alt={partner?.member.displayName} className="w-full h-full object-cover" />
+                  ) : (
+                    partner ? initials(partner.member.displayName) : "?"
+                  )}
                 </div>
               </div>
               <div className="min-w-0 text-right">
@@ -234,15 +242,27 @@ export default function LoadScoreBar() {
         </div>
 
         {/* Imbalance nudge */}
-        {imbalanced && (
-          <div className="px-5 py-3 bg-orange-50 border-t border-orange-100/80 flex items-start gap-2.5">
-            <span className="text-base leading-none mt-0.5">💬</span>
-            <p className="text-xs text-orange-700 leading-relaxed">
-              <span className="font-semibold">Worth a conversation?</span> One person is carrying
-              most of the load right now.
-            </p>
-          </div>
-        )}
+        {imbalanced && (() => {
+          const overloadedName = primaryPct > partnerPct
+            ? (primary?.member.displayName ?? "one person")
+            : (partner?.member.displayName ?? "one person");
+          const sentences = [
+            { icon: "🌱", text: `A balanced household makes everyone happier — ${overloadedName} could use a hand right now.` },
+            { icon: "💬", text: `Worth a conversation? ${overloadedName} is carrying most of the load at the moment.` },
+            { icon: "🤝", text: `Sharing the load evenly is one of the kindest things partners can do for each other.` },
+            { icon: "✨", text: `When both people feel seen, the whole household runs better. ${overloadedName} might need some relief.` },
+            { icon: "💪", text: `Teamwork makes the dream work — ${overloadedName} has a lot on their plate right now.` },
+          ];
+          // Pick a stable sentence based on the overloaded person's name (consistent per session)
+          const idx = overloadedName.charCodeAt(0) % sentences.length;
+          const { icon, text } = sentences[idx];
+          return (
+            <div className="px-5 py-3 bg-orange-50 border-t border-orange-100/80 flex items-start gap-2.5">
+              <span className="text-base leading-none mt-0.5">{icon}</span>
+              <p className="text-xs text-orange-700 leading-relaxed">{text}</p>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Threshold settings dialog */}

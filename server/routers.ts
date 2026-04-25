@@ -24,6 +24,7 @@ import {
   restoreInferenceType,
   updateEventGoogleIds,
   updateHouseholdThreshold,
+  updateMemberAvatar,
   updateMemberCalendarToken,
   updateTask,
   upsertHouseholdRhythm,
@@ -123,6 +124,28 @@ export const appRouter = router({
         const household = await requireHousehold(input.token);
         await updateHouseholdThreshold(household.id, input.threshold);
         return { success: true };
+      }),
+    uploadAvatar: publicProcedure
+      .input(
+        z.object({
+          token: z.string(),
+          memberId: z.number(),
+          imageBase64: z.string(), // base64-encoded image data
+          mimeType: z.string().default("image/jpeg"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const members = await getMembersByHousehold(household.id);
+        const member = members.find((m) => m.id === input.memberId);
+        if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+        const { storagePut } = await import("./storage");
+        const buffer = Buffer.from(input.imageBase64, "base64");
+        const ext = input.mimeType.split("/")[1] ?? "jpg";
+        const key = `avatars/member-${input.memberId}-${Date.now()}.${ext}`;
+        const { url } = await storagePut(key, buffer, input.mimeType);
+        await updateMemberAvatar(input.memberId, url);
+        return { avatarUrl: url };
       }),
   }),
 

@@ -153,6 +153,12 @@ export async function updateMemberCalendarToken(memberId: number, token: string 
   await db.update(householdMembers).set({ googleCalendarToken: token }).where(eq(householdMembers.id, memberId));
 }
 
+export async function updateMemberAvatar(memberId: number, avatarUrl: string | null) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(householdMembers).set({ avatarUrl }).where(eq(householdMembers.id, memberId));
+}
+
 // ─── Household Rhythm ─────────────────────────────────────────────────────────
 
 export async function upsertHouseholdRhythm(

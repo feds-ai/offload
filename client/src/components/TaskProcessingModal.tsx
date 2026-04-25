@@ -95,7 +95,14 @@ export default function TaskProcessingModal({
   const createEvent = trpc.events.create.useMutation();
   const createTask = trpc.tasks.create.useMutation();
   const dismissInference = trpc.routing.dismiss.useMutation();
+  const learnRule = trpc.routing.learnRule.useMutation();
   const utils = trpc.useUtils();
+
+  // Fetch existing routing rules so we know which categories already have a rule
+  const { data: existingRules } = trpc.routing.getRules.useQuery(
+    { token: token ?? "" },
+    { enabled: !!token }
+  );
 
   // Fetch routing suggestions for each task
   const routingSuggestions = trpc.routing.suggestBatch.useQuery(
@@ -139,7 +146,14 @@ export default function TaskProcessingModal({
 
   function isRoutingUnknown(i: number): boolean {
     const suggestion = routingSuggestions.data?.find((s) => s.index === i);
-    return !suggestion || suggestion.confidence === "low";
+    if (!suggestion || suggestion.confidence === "low") return true;
+    // Also ask if there's no existing rule for this category (first time seeing it)
+    const task = result?.tasks[i];
+    if (!task) return false;
+    const hasRule = (existingRules ?? []).some(
+      (r: any) => r.category === task.category
+    );
+    return !hasRule;
   }
 
   async function handleConfirm() {
@@ -188,9 +202,35 @@ export default function TaskProcessingModal({
         });
       }
 
+      // Learn routing rules from confirmed owner assignments
+      const learnedCategories = new Set<string>();
+      for (let i = 0; i < result!.tasks.length; i++) {
+        if (removedTasks.has(i)) continue;
+        const task = result!.tasks[i];
+        const ownerId = getOwner(i, task);
+        const categoryKey = task.category;
+        // Only learn once per category per batch, and only if user explicitly picked or no rule exists
+        if (!learnedCategories.has(categoryKey)) {
+          learnedCategories.add(categoryKey);
+          try {
+            await learnRule.mutateAsync({
+              token,
+              category: task.category,
+              subject: task.subject !== "any" ? task.subject : undefined,
+              qualifier: task.qualifier,
+              assigneeMemberId: ownerId,
+              permanent: true,
+            });
+          } catch {
+            // Non-fatal — routing rule learning failure shouldn't block task save
+          }
+        }
+      }
+
       utils.tasks.list.invalidate();
       utils.tasks.listMine.invalidate();
       utils.load.scores.invalidate();
+      utils.routing.getRules.invalidate();
       toast.success(`Saved ${result!.events.length} event(s) and ${activeTasks.length} task(s)`);
       onConfirm();
     } catch (e: any) {

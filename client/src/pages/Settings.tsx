@@ -17,6 +17,7 @@ import {
   Route,
   RefreshCw,
   Leaf,
+  Camera,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -49,10 +50,44 @@ export default function Settings() {
   const [thresholdValue, setThresholdValue] = useState<number | null>(null);
   const [rhythmText, setRhythmText] = useState("");
   const [rhythmEditing, setRhythmEditing] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState<number | null>(null);
 
+  const uploadAvatar = trpc.household.uploadAvatar.useMutation({
+    onSuccess: () => {
+      utils.household.getByToken.invalidate();
+      toast.success("Profile picture updated!");
+    },
+    onError: () => toast.error("Failed to upload picture."),
+  });
+
+  const utils = trpc.useUtils();
   const primaryMember = members.find((m) => m.role === "primary");
   const partnerMember = members.find((m) => m.role === "partner");
   const myMember = members.find((m) => m.id === myMemberId);
+
+  async function handleAvatarChange(memberId: number, file: File) {
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error("Image must be under 4 MB.");
+      return;
+    }
+    setAvatarUploading(memberId);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      await uploadAvatar.mutateAsync({
+        token: token ?? "",
+        memberId,
+        imageBase64: base64,
+        mimeType: file.type,
+      });
+    } finally {
+      setAvatarUploading(null);
+    }
+  }
 
   // ─── Routing rules ──────────────────────────────────────────────────────────
   const { data: rules, refetch: refetchRules } = trpc.routing.getRules.useQuery(
@@ -83,7 +118,6 @@ export default function Settings() {
   });
 
   // ─── Imbalance threshold ────────────────────────────────────────────────────
-  const utils = trpc.useUtils();
   const updateThresholdMutation = trpc.household.updateThreshold.useMutation({
     onSuccess: () => {
       utils.load.scores.invalidate();
@@ -190,8 +224,8 @@ export default function Settings() {
 
         {/* ─── Identity ─────────────────────────────────────────────────────── */}
         <section>
-          <div className="section-label mb-3">Your Identity</div>
-          <div className="card-glass rounded-2xl p-4 space-y-3">
+          <div className="section-label mb-3">Household Members</div>
+          <div className="card-glass rounded-2xl p-4 space-y-4">
             <p className="text-sm text-muted-foreground">
               You are currently identified as{" "}
               <span className="font-semibold text-foreground">
@@ -199,20 +233,55 @@ export default function Settings() {
               </span>{" "}
               on this device.
             </p>
-            <div className="flex gap-2">
-              {members.map((m) => (
-                <Button
-                  key={m.id}
-                  variant={m.id === myMemberId ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    if (token) persistIdentity(token, m.id);
-                    toast.success(`Switched to ${m.displayName}`);
-                  }}
-                >
-                  {m.displayName}
-                </Button>
-              ))}
+            {/* Member avatars */}
+            <div className="flex gap-4">
+              {members.map((m) => {
+                const isUploading = avatarUploading === m.id;
+                const initials = m.displayName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
+                return (
+                  <div key={m.id} className="flex flex-col items-center gap-2">
+                    <label className="relative cursor-pointer group" title="Change profile picture">
+                      <div className="w-16 h-16 rounded-full overflow-hidden bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
+                        {(m as any).avatarUrl ? (
+                          <img src={(m as any).avatarUrl} alt={m.displayName} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-lg font-semibold text-primary">{initials}</span>
+                        )}
+                        {isUploading && (
+                          <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center">
+                            <RefreshCw className="h-5 w-5 text-white animate-spin" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                        <Camera className="h-3 w-3 text-white" />
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleAvatarChange(m.id, file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <span className="text-xs font-medium text-foreground">{m.displayName}</span>
+                    <Button
+                      variant={m.id === myMemberId ? "default" : "outline"}
+                      size="sm"
+                      className="text-xs h-7 px-3"
+                      onClick={() => {
+                        if (token) persistIdentity(token, m.id);
+                        toast.success(`Switched to ${m.displayName}`);
+                      }}
+                    >
+                      {m.id === myMemberId ? "Active" : "Switch"}
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>

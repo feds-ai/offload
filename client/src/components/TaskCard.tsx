@@ -150,7 +150,16 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
 
   async function markDone() {
     await updateTask.mutateAsync({ taskId: task.id, token: token ?? "", status: "done" });
-    toast.success("Done ✓");
+    const nudges = [
+      `✨ Done! One less thing on your plate.`,
+      `✅ Ticked off! You're on a roll.`,
+      `🎉 That's one more thing handled — well done.`,
+      `💪 Nice work! The household thanks you.`,
+      `🌿 Done and dusted. Keep it up!`,
+      `✨ Another one down. You're making it happen.`,
+    ];
+    const msg = nudges[Math.floor(Math.random() * nudges.length)];
+    toast(msg, { duration: 3500 });
   }
 
   async function markOpen() {
@@ -338,11 +347,21 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
                 </span>
               )}
 
-              {/* Owner chip — pill with initials */}
+              {/* Category badge */}
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/70 bg-muted/40 px-1.5 py-0.5 rounded-md">
+                <span>{CATEGORY_ICONS[task.category] ?? "✅"}</span>
+                <span className="capitalize">{task.category}</span>
+              </span>
+
+              {/* Owner chip — pill with avatar or initials */}
               {ownerMember && (
                 <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground/80 bg-muted/50 px-2 py-0.5 rounded-full border border-border/40">
-                  <span className="w-3.5 h-3.5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[9px] font-bold leading-none">
-                    {ownerInitials(ownerMember.displayName)}
+                  <span className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[9px] font-bold leading-none overflow-hidden shrink-0">
+                    {(ownerMember as any).avatarUrl ? (
+                      <img src={(ownerMember as any).avatarUrl} alt={ownerMember.displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      ownerInitials(ownerMember.displayName)
+                    )}
                   </span>
                   {ownerMember.displayName}
                 </span>
