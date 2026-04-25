@@ -40,8 +40,9 @@ type TaskView = "household" | "mine" | "partner";
 export default function SharedView() {
   const params = useParams<{ token: string }>();
   const token = params.token;
-  const { household, members, myMemberId, setHousehold, setMembers, setMyMemberId } = useHousehold();
-  const [identityOpen, setIdentityOpen] = useState(true);
+  const { household, members, myMemberId, setHousehold, setMembers, setToken, persistIdentity } = useHousehold();
+  // If we already know who this person is on this device, skip the identity dialog
+  const [identityOpen, setIdentityOpen] = useState(myMemberId === null);
   const [view, setView] = useState<TaskView>("household");
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -51,19 +52,25 @@ export default function SharedView() {
   );
 
   const { data: allTasks, refetch: refetchAll } = trpc.tasks.list.useQuery(
-    { householdId: household?.id ?? 0 },
-    { enabled: !!household?.id && !identityOpen }
+    { token: token ?? "" },
+    { enabled: !!token && !identityOpen }
   );
 
+  // Store the token from the URL into localStorage so this device remembers the household
+  useEffect(() => {
+    if (token) setToken(token);
+  }, [token]);
   useEffect(() => {
     if (householdData) {
       setHousehold(householdData.household as any);
       setMembers(householdData.members as any);
+      // If we already have a memberId stored, skip identity check
+      if (myMemberId !== null) setIdentityOpen(false);
     }
   }, [householdData]);
 
   function selectIdentity(memberId: number) {
-    setMyMemberId(memberId);
+    if (token) persistIdentity(token, memberId);
     setIdentityOpen(false);
   }
 

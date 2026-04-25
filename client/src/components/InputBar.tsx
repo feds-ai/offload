@@ -14,7 +14,7 @@ interface InputBarProps {
 type InputMode = "text" | "image" | "voice" | "url";
 
 export default function InputBar({ onTasksAdded }: InputBarProps) {
-  const { household } = useHousehold();
+  const { token } = useHousehold();
   const [mode, setMode] = useState<InputMode>("text");
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -82,7 +82,7 @@ export default function InputBar({ onTasksAdded }: InputBarProps) {
   }
 
   async function handleSubmit() {
-    if (!household) {
+    if (!token) {
       toast.error("No household found");
       return;
     }
@@ -92,7 +92,7 @@ export default function InputBar({ onTasksAdded }: InputBarProps) {
       if (mode === "text" || mode === "url") {
         const inputText = mode === "url" ? `URL: ${urlInput}\n${text}` : text;
         if (!inputText.trim()) { toast.error("Please enter some text"); return; }
-        result = await extractFromText.mutateAsync({ householdId: household.id, text: inputText });
+        result = await extractFromText.mutateAsync({ token, text: inputText });
       } else if (mode === "image" && imageFile) {
         const reader = new FileReader();
         const base64 = await new Promise<string>((res, rej) => {
@@ -104,7 +104,7 @@ export default function InputBar({ onTasksAdded }: InputBarProps) {
           reader.readAsDataURL(imageFile);
         });
         result = await extractFromImage.mutateAsync({
-          householdId: household.id,
+          token,
           imageBase64: base64,
           mimeType: imageFile.type,
         });
@@ -119,7 +119,7 @@ export default function InputBar({ onTasksAdded }: InputBarProps) {
           reader.readAsDataURL(audioBlob);
         });
         result = await extractFromVoice.mutateAsync({
-          householdId: household.id,
+          token,
           audioBase64: base64,
           mimeType: "audio/webm",
         });
@@ -149,7 +149,7 @@ export default function InputBar({ onTasksAdded }: InputBarProps) {
 
   const canSubmit =
     !processing &&
-    household &&
+    !!token &&
     ((mode === "text" && text.trim()) ||
       (mode === "url" && urlInput.trim()) ||
       (mode === "image" && imageFile) ||

@@ -179,4 +179,28 @@
       max-width: 1280px; /* Standard content width */
     }
   }
+
+  /* Urgency badge colour variants */
+  .urgency-high {
+    border-color: oklch(0.8 0.12 50);
+    color: oklch(0.45 0.15 50);
+    background-color: oklch(0.97 0.04 60);
+  }
+  .urgency-medium {
+    border-color: oklch(0.85 0.1 75);
+    color: oklch(0.5 0.12 75);
+    background-color: oklch(0.97 0.04 80);
+  }
+  .urgency-low {
+    color: oklch(0.52 0.02 185);
+    background-color: transparent;
+  }
+
+  /* Mental load bar colours */
+  .load-bar-primary {
+    background: oklch(0.52 0.12 185);
+  }
+  .load-bar-partner {
+    background: oklch(0.68 0.1 155);
+  }
 }

@@ -16,17 +16,16 @@ import {
   getHouseholdById,
   getHouseholdByToken,
   getMemberById,
-  getMemberByUserId,
   getMembersByHousehold,
   getRoutingRules,
   getTasksByHousehold,
   getTasksByMember,
+  getHouseholdRhythm,
   restoreInferenceType,
   updateHouseholdThreshold,
   updateMemberCalendarToken,
   updateTask,
   upsertHouseholdRhythm,
-  upsertUser,
 } from "./db";
 import {
   extractFromText,
@@ -36,18 +35,32 @@ import {
   suggestRouting,
   transcribeVoiceNote,
 } from "./ai";
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Token-based auth helpers ─────────────────────────────────────────────────
 
-async function requireMembership(userId: number, householdId: number) {
-  const member = await getMemberByUserId(userId, householdId);
-  if (!member) throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this household" });
-  return member;
+/**
+ * Validate a household share token and return the household.
+ * This replaces session-based auth — any holder of the token can access the household.
+ */
+async function requireHousehold(token: string) {
+  const household = await getHouseholdByToken(token);
+  if (!household) throw new TRPCError({ code: "NOT_FOUND", message: "Household not found" });
+  return household;
+}
+
+/**
+ * Validate a member belongs to the household identified by the token.
+ */
+async function requireMember(token: string, memberId: number) {
+  const household = await requireHousehold(token);
+  const member = await getMemberById(memberId);
+  if (!member || member.householdId !== household.id) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Member not found in this household" });
+  }
+  return { household, member };
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -55,27 +68,18 @@ async function requireMembership(userId: number, householdId: number) {
 export const appRouter = router({
   system: systemRouter,
 
-  auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
-    }),
-  }),
-
   // ─── Household ─────────────────────────────────────────────────────────────
 
   household: router({
-    // Create a new household during onboarding
-    create: protectedProcedure
+    // Create a new household during onboarding — no login required
+    create: publicProcedure
       .input(
         z.object({
           primaryName: z.string().min(1),
           partnerName: z.string().min(1),
         })
       )
-      .mutation(async ({ input, ctx }) => {
+      .mutation(async ({ input }) => {
         const shareToken = nanoid(32);
         const household = await createHousehold(
           `${input.primaryName} & ${input.partnerName}'s Household`,
@@ -83,18 +87,24 @@ export const appRouter = router({
         );
         if (!household) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-        // Create primary member for the logged-in user
+        // Create both members immediately — no user account needed
         const primaryMember = await createHouseholdMember(
           household.id,
-          ctx.user.id,
+          null,
           input.primaryName,
           "primary"
         );
+        const partnerMember = await createHouseholdMember(
+          household.id,
+          null,
+          input.partnerName,
+          "partner"
+        );
 
-        return { household, primaryMember };
+        return { household, primaryMember, partnerMember };
       }),
 
-    // Get household by share token (for the shared link)
+    // Get household by share token
     getByToken: publicProcedure
       .input(z.object({ token: z.string() }))
       .query(async ({ input }) => {
@@ -104,30 +114,11 @@ export const appRouter = router({
         return { household, members };
       }),
 
-    // Get household info for authenticated user
-    getMine: protectedProcedure.query(async ({ ctx }) => {
-      // Find household where user is a member
-      const db = await import("./db").then((m) => m.getDb());
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { householdMembers } = await import("../drizzle/schema");
-      const { eq } = await import("drizzle-orm");
-      const memberRows = await db
-        .select()
-        .from(householdMembers)
-        .where(eq(householdMembers.userId, ctx.user.id))
-        .limit(1);
-      if (!memberRows[0]) return null;
-      const household = await getHouseholdById(memberRows[0].householdId);
-      if (!household) return null;
-      const members = await getMembersByHousehold(household.id);
-      return { household, members, myMemberId: memberRows[0].id };
-    }),
-
-    updateThreshold: protectedProcedure
-      .input(z.object({ householdId: z.number(), threshold: z.number().min(0.5).max(1) }))
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        await updateHouseholdThreshold(input.householdId, input.threshold);
+    updateThreshold: publicProcedure
+      .input(z.object({ token: z.string(), threshold: z.number().min(0.5).max(1) }))
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        await updateHouseholdThreshold(household.id, input.threshold);
         return { success: true };
       }),
   }),
@@ -135,28 +126,26 @@ export const appRouter = router({
   // ─── Onboarding ────────────────────────────────────────────────────────────
 
   onboarding: router({
-    // Save household rhythm
-    saveRhythm: protectedProcedure
+    saveRhythm: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           rawText: z.string().min(1),
           primaryName: z.string(),
           partnerName: z.string(),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
         const structured = await parseHouseholdRhythm(input.rawText, input.primaryName, input.partnerName);
-        await upsertHouseholdRhythm(input.householdId, input.rawText, structured);
+        await upsertHouseholdRhythm(household.id, input.rawText, structured);
         return { structured };
       }),
 
-    // Save domain assignment rules from onboarding toggle list
-    saveDomainAssignment: protectedProcedure
+    saveDomainAssignment: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           assignments: z.array(
             z.object({
               category: z.string(),
@@ -167,21 +156,20 @@ export const appRouter = router({
           partnerMemberId: z.number(),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
         for (const a of input.assignments) {
           if (a.assignee === "ask") continue;
           const memberId = a.assignee === "primary" ? input.primaryMemberId : input.partnerMemberId;
-          await createRoutingRule(input.householdId, a.category, null, null, memberId, "onboarding");
+          await createRoutingRule(household.id, a.category, null, null, memberId, "onboarding");
         }
         return { success: true };
       }),
 
-    // Parse and save routing exceptions (free-text nuance)
-    saveExceptions: protectedProcedure
+    saveExceptions: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           exceptionsText: z.string(),
           primaryName: z.string(),
           partnerName: z.string(),
@@ -189,8 +177,8 @@ export const appRouter = router({
           partnerMemberId: z.number(),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
         const parsed = await parseRoutingExceptions(
           input.exceptionsText,
           input.primaryName,
@@ -199,7 +187,7 @@ export const appRouter = router({
         for (const rule of parsed.rules) {
           const memberId = rule.assignee === "primary" ? input.primaryMemberId : input.partnerMemberId;
           await createRoutingRule(
-            input.householdId,
+            household.id,
             rule.category,
             rule.subject ?? null,
             rule.qualifier ?? null,
@@ -209,92 +197,69 @@ export const appRouter = router({
         }
         return { success: true };
       }),
-
-    // Register partner (called when partner opens the shared link and logs in)
-    registerPartner: protectedProcedure
-      .input(z.object({ householdId: z.number(), displayName: z.string().min(1) }))
-      .mutation(async ({ input, ctx }) => {
-        const existing = await getMemberByUserId(ctx.user.id, input.householdId);
-        if (existing) return { member: existing };
-        const member = await createHouseholdMember(
-          input.householdId,
-          ctx.user.id,
-          input.displayName,
-          "partner"
-        );
-        return { member };
-      }),
   }),
 
   // ─── AI Extraction ─────────────────────────────────────────────────────────
 
   extract: router({
-    // Process text input
-    fromText: protectedProcedure
+    fromText: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           text: z.string().min(1),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        const dismissed = await getDismissedInferenceTypes(input.householdId);
+      .mutation(async ({ input }) => {
+        await requireHousehold(input.token);
+        const household = await getHouseholdByToken(input.token);
+        const dismissed = await getDismissedInferenceTypes(household!.id);
         const dismissedTypes = dismissed.map((d) => d.inferenceType);
         const result = await extractFromText(input.text, dismissedTypes);
         return result;
       }),
 
-    // Process image: upload to storage, extract text via LLM vision, discard original
-    fromImage: protectedProcedure
+    fromImage: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           imageBase64: z.string(),
           mimeType: z.string(),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
 
-        // Upload temporarily to get a URL for LLM vision
         const buffer = Buffer.from(input.imageBase64, "base64");
         const tempKey = `temp/${nanoid(16)}.${input.mimeType.split("/")[1] ?? "jpg"}`;
         const { url } = await storagePut(tempKey, buffer, input.mimeType);
 
-        // Extract text via LLM vision
         const extractedText = await extractTextFromImageUrl(url);
 
-        // Do NOT store the image — only the extracted text is used
-        const dismissed = await getDismissedInferenceTypes(input.householdId);
+        const dismissed = await getDismissedInferenceTypes(household.id);
         const dismissedTypes = dismissed.map((d) => d.inferenceType);
         const result = await extractFromText(extractedText, dismissedTypes);
         return result;
       }),
 
-    // Process voice note: transcribe via Whisper, then extract
-    fromVoice: protectedProcedure
+    fromVoice: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           audioBase64: z.string(),
           mimeType: z.string().default("audio/webm"),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
 
-        // Upload audio temporarily for Whisper transcription
         const buffer = Buffer.from(input.audioBase64, "base64");
         const ext = input.mimeType.split("/")[1] ?? "webm";
         const tempKey = `temp/voice-${nanoid(16)}.${ext}`;
         const { url } = await storagePut(tempKey, buffer, input.mimeType);
 
-        // Transcribe via Whisper
         const transcript = await transcribeVoiceNote(url);
 
-        // Extract from transcript
-        const dismissed = await getDismissedInferenceTypes(input.householdId);
+        const dismissed = await getDismissedInferenceTypes(household.id);
         const dismissedTypes = dismissed.map((d) => d.inferenceType);
         const result = await extractFromText(transcript, dismissedTypes);
         return { ...result, transcript };
@@ -304,27 +269,27 @@ export const appRouter = router({
   // ─── Routing ───────────────────────────────────────────────────────────────
 
   routing: router({
-    getRules: protectedProcedure
-      .input(z.object({ householdId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        return getRoutingRules(input.householdId);
+    getRules: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        return getRoutingRules(household.id);
       }),
 
-    suggest: protectedProcedure
+    suggest: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           taskTitle: z.string(),
           category: z.string(),
           subject: z.string(),
           qualifier: z.string().optional(),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        const rules = await getRoutingRules(input.householdId);
-        const members = await getMembersByHousehold(input.householdId);
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const rules = await getRoutingRules(household.id);
+        const members = await getMembersByHousehold(household.id);
         const primary = members.find((m) => m.role === "primary");
         const partner = members.find((m) => m.role === "partner");
 
@@ -347,11 +312,10 @@ export const appRouter = router({
         return { ...suggestion, memberId: assignedMember?.id };
       }),
 
-    // Learn a new rule from user confirmation
-    learnRule: protectedProcedure
+    learnRule: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           category: z.string(),
           subject: z.string().optional(),
           qualifier: z.string().optional(),
@@ -359,11 +323,11 @@ export const appRouter = router({
           permanent: z.boolean().default(true),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
         if (input.permanent) {
           await createRoutingRule(
-            input.householdId,
+            household.id,
             input.category,
             input.subject ?? null,
             input.qualifier ?? null,
@@ -374,48 +338,51 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    deleteRule: protectedProcedure
-      .input(z.object({ ruleId: z.number(), householdId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
+    deleteRule: publicProcedure
+      .input(z.object({ token: z.string(), ruleId: z.number() }))
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        // Verify rule belongs to this household
+        const rules = await getRoutingRules(household.id);
+        const rule = rules.find((r) => r.id === input.ruleId);
+        if (!rule) throw new TRPCError({ code: "NOT_FOUND" });
         await deleteRoutingRule(input.ruleId);
         return { success: true };
       }),
 
-    getDismissed: protectedProcedure
-      .input(z.object({ householdId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        return getDismissedInferenceTypes(input.householdId);
+    getDismissed: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        return getDismissedInferenceTypes(household.id);
       }),
 
-    dismiss: protectedProcedure
+    dismiss: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           inferenceType: z.string(),
           label: z.string(),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        await dismissInferenceType(input.householdId, input.inferenceType, input.label);
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        await dismissInferenceType(household.id, input.inferenceType, input.label);
         return { success: true };
       }),
 
-    restore: protectedProcedure
-      .input(z.object({ householdId: z.number(), inferenceType: z.string() }))
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        await restoreInferenceType(input.householdId, input.inferenceType);
+    restore: publicProcedure
+      .input(z.object({ token: z.string(), inferenceType: z.string() }))
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        await restoreInferenceType(household.id, input.inferenceType);
         return { success: true };
       }),
 
-    // Batch routing suggestions for the task processing modal
-    suggestBatch: protectedProcedure
+    suggestBatch: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           tasks: z.array(
             z.object({
               index: z.number(),
@@ -427,10 +394,10 @@ export const appRouter = router({
           ),
         })
       )
-      .query(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        const rules = await getRoutingRules(input.householdId);
-        const members = await getMembersByHousehold(input.householdId);
+      .query(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const rules = await getRoutingRules(household.id);
+        const members = await getMembersByHousehold(household.id);
         const primary = members.find((m) => m.role === "primary");
         const partner = members.find((m) => m.role === "partner");
         const rulesWithAssignee = rules.map((r) => ({
@@ -456,24 +423,24 @@ export const appRouter = router({
   // ─── Tasks ─────────────────────────────────────────────────────────────────
 
   tasks: router({
-    list: protectedProcedure
-      .input(z.object({ householdId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        return getTasksByHousehold(input.householdId);
+    list: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        return getTasksByHousehold(household.id);
       }),
 
-    listMine: protectedProcedure
-      .input(z.object({ householdId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const member = await requireMembership(ctx.user.id, input.householdId);
-        return getTasksByMember(input.householdId, member.id);
+    listMine: publicProcedure
+      .input(z.object({ token: z.string(), memberId: z.number() }))
+      .query(async ({ input }) => {
+        const { household } = await requireMember(input.token, input.memberId);
+        return getTasksByMember(household.id, input.memberId);
       }),
 
-    create: protectedProcedure
+    create: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           eventId: z.number().optional(),
           title: z.string().min(1),
           description: z.string().optional(),
@@ -481,17 +448,17 @@ export const appRouter = router({
           subject: z.string().default("any"),
           qualifier: z.string().optional(),
           ownerMemberId: z.number(),
-          deadline: z.string().optional(), // ISO string
+          deadline: z.string().optional(),
           urgency: z.enum(["low", "medium", "high"]).default("medium"),
           isRecurringSuggestion: z.boolean().default(false),
           isRecurring: z.boolean().default(false),
           lowConfidence: z.boolean().default(false),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
         const task = await createTask({
-          householdId: input.householdId,
+          householdId: household.id,
           eventId: input.eventId,
           title: input.title,
           description: input.description,
@@ -508,11 +475,11 @@ export const appRouter = router({
         return task;
       }),
 
-    update: protectedProcedure
+    update: publicProcedure
       .input(
         z.object({
+          token: z.string(),
           taskId: z.number(),
-          householdId: z.number(),
           title: z.string().optional(),
           description: z.string().optional(),
           ownerMemberId: z.number().optional(),
@@ -523,9 +490,14 @@ export const appRouter = router({
           isRecurring: z.boolean().optional(),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        const { taskId, householdId, deadline, ...rest } = input;
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const { token, taskId, deadline, ...rest } = input;
+        // Verify task belongs to this household
+        const allTasks = await getTasksByHousehold(household.id);
+        if (!allTasks.find((t) => t.id === taskId)) {
+          throw new TRPCError({ code: "NOT_FOUND" });
+        }
         await updateTask(taskId, {
           ...rest,
           ...(deadline !== undefined ? { deadline: deadline ? new Date(deadline) : null } : {}),
@@ -533,10 +505,14 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
-      .input(z.object({ taskId: z.number(), householdId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
+    delete: publicProcedure
+      .input(z.object({ token: z.string(), taskId: z.number() }))
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const allTasks = await getTasksByHousehold(household.id);
+        if (!allTasks.find((t) => t.id === input.taskId)) {
+          throw new TRPCError({ code: "NOT_FOUND" });
+        }
         await deleteTask(input.taskId);
         return { success: true };
       }),
@@ -545,17 +521,17 @@ export const appRouter = router({
   // ─── Events ────────────────────────────────────────────────────────────────
 
   events: router({
-    list: protectedProcedure
-      .input(z.object({ householdId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        return getEventsByHousehold(input.householdId);
+    list: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        return getEventsByHousehold(household.id);
       }),
 
-    create: protectedProcedure
+    create: publicProcedure
       .input(
         z.object({
-          householdId: z.number(),
+          token: z.string(),
           title: z.string().min(1),
           description: z.string().optional(),
           location: z.string().optional(),
@@ -564,9 +540,9 @@ export const appRouter = router({
           subjectName: z.string().optional(),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        const event = await createEvent(input.householdId, {
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const event = await createEvent(household.id, {
           title: input.title,
           description: input.description,
           location: input.location,
@@ -581,13 +557,12 @@ export const appRouter = router({
   // ─── Load scores ───────────────────────────────────────────────────────────
 
   load: router({
-    scores: protectedProcedure
-      .input(z.object({ householdId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        const members = await getMembersByHousehold(input.householdId);
-        const allTasks = await getTasksByHousehold(input.householdId);
-        const household = await getHouseholdById(input.householdId);
+    scores: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const members = await getMembersByHousehold(household.id);
+        const allTasks = await getTasksByHousehold(household.id);
 
         const scores = members.map((m) => {
           const memberTasks = allTasks.filter((t) => t.ownerMemberId === m.id);
@@ -597,7 +572,7 @@ export const appRouter = router({
         });
 
         const totalScore = scores.reduce((s, m) => s + m.score, 0);
-        const threshold = household?.imbalanceThreshold ?? 0.6;
+        const threshold = household.imbalanceThreshold ?? 0.6;
 
         let imbalanced = false;
         if (totalScore > 0 && scores.length === 2) {
@@ -609,22 +584,55 @@ export const appRouter = router({
       }),
   }),
 
+  // ─── Settings ──────────────────────────────────────────────────────────────
+
+  settings: router({
+    getRhythm: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        return getHouseholdRhythm(household.id);
+      }),
+
+    updateRhythm: publicProcedure
+      .input(
+        z.object({
+          token: z.string(),
+          rawText: z.string().min(1),
+          primaryName: z.string(),
+          partnerName: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const members = await getMembersByHousehold(household.id);
+        const primary = members.find((m) => m.role === "primary");
+        const partner = members.find((m) => m.role === "partner");
+        const structured = await parseHouseholdRhythm(
+          input.rawText,
+          primary?.displayName ?? input.primaryName,
+          partner?.displayName ?? input.partnerName
+        );
+        await upsertHouseholdRhythm(household.id, input.rawText, structured);
+        return { structured };
+      }),
+  }),
+
   // ─── Calendar ──────────────────────────────────────────────────────────────
 
   calendar: router({
-    saveToken: protectedProcedure
-      .input(z.object({ householdId: z.number(), token: z.string() }))
-      .mutation(async ({ input, ctx }) => {
-        const member = await requireMembership(ctx.user.id, input.householdId);
-        await updateMemberCalendarToken(member.id, input.token);
+    saveToken: publicProcedure
+      .input(z.object({ token: z.string(), memberId: z.number(), calendarToken: z.string() }))
+      .mutation(async ({ input }) => {
+        await requireMember(input.token, input.memberId);
+        await updateMemberCalendarToken(input.memberId, input.calendarToken);
         return { success: true };
       }),
 
-    getAuthUrl: protectedProcedure
-      .input(z.object({ householdId: z.number(), redirectUri: z.string() }))
-      .query(async ({ input, ctx }) => {
-        await requireMembership(ctx.user.id, input.householdId);
-        // Return the Google OAuth URL — client ID must be configured via secrets
+    getAuthUrl: publicProcedure
+      .input(z.object({ token: z.string(), redirectUri: z.string() }))
+      .query(async ({ input }) => {
+        await requireHousehold(input.token);
         const clientId = process.env.GOOGLE_CLIENT_ID;
         if (!clientId) {
           return { url: null, configured: false };

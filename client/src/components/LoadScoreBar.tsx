@@ -14,15 +14,15 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 
 export default function LoadScoreBar() {
-  const { household, members } = useHousehold();
+  const { household, members, token } = useHousehold();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [threshold, setThreshold] = useState<number[]>([
     Math.round((household?.imbalanceThreshold ?? 0.6) * 100),
   ]);
 
   const { data: loadData, refetch } = trpc.load.scores.useQuery(
-    { householdId: household?.id ?? 0 },
-    { enabled: !!household?.id, refetchInterval: 30000 }
+    { token: token ?? "" },
+    { enabled: !!token, refetchInterval: 30000 }
   );
 
   const updateThreshold = trpc.household.updateThreshold.useMutation({
@@ -45,7 +45,7 @@ export default function LoadScoreBar() {
   async function saveThreshold() {
     if (!household) return;
     await updateThreshold.mutateAsync({
-      householdId: household.id,
+      token: token ?? "",
       threshold: threshold[0] / 100,
     });
   }

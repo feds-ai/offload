@@ -88,7 +88,7 @@ function formatDeadline(deadline: Date | null): string | null {
 }
 
 export default function TaskCard({ task, onRefresh }: TaskCardProps) {
-  const { members, household } = useHousehold();
+  const { members, token } = useHousehold();
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDeadline, setEditDeadline] = useState(
@@ -117,8 +117,8 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
 
   const dismissInference = trpc.routing.dismiss.useMutation();
   const { data: dismissedTypes } = trpc.routing.getDismissed.useQuery(
-    { householdId: task.householdId },
-    { enabled: !!task.householdId }
+    { token: token ?? "" },
+    { enabled: !!token }
   );
 
   const ownerMember = members.find((m) => m.id === task.ownerMemberId);
@@ -129,7 +129,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
   async function markDone() {
     await updateTask.mutateAsync({
       taskId: task.id,
-      householdId: task.householdId,
+      token: token ?? "",
       status: "done",
     });
     toast.success("Task marked as done ✓");
@@ -138,7 +138,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
   async function markOpen() {
     await updateTask.mutateAsync({
       taskId: task.id,
-      householdId: task.householdId,
+      token: token ?? "",
       status: "open",
     });
   }
@@ -146,7 +146,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
   async function snooze() {
     await updateTask.mutateAsync({
       taskId: task.id,
-      householdId: task.householdId,
+      token: token ?? "",
       status: "snoozed",
     });
     toast.success("Task snoozed — it'll come back soon");
@@ -156,7 +156,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
     if (!otherMember) return;
     await updateTask.mutateAsync({
       taskId: task.id,
-      householdId: task.householdId,
+      token: token ?? "",
       ownerMemberId: otherMember.id,
     });
     toast.success(`Reassigned to ${otherMember.displayName}`);
@@ -165,7 +165,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
   async function setUrgencyHigh() {
     await updateTask.mutateAsync({
       taskId: task.id,
-      householdId: task.householdId,
+      token: token ?? "",
       urgency: "high",
       urgencyOverridden: true,
     });
@@ -175,7 +175,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
   async function saveEdit() {
     await updateTask.mutateAsync({
       taskId: task.id,
-      householdId: task.householdId,
+      token: token ?? "",
       title: editTitle,
       deadline: editDeadline || null,
     });
@@ -184,7 +184,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
   }
 
   async function handleDelete() {
-    await deleteTask.mutateAsync({ taskId: task.id, householdId: task.householdId });
+    await deleteTask.mutateAsync({ taskId: task.id, token: token ?? "" });
     // Learn from deletion: if this was an inferred task type, dismiss it
     const inferenceKey = `${task.category}:${task.subject ?? "any"}`;
     const alreadyDismissed = (dismissedTypes ?? []).some(
@@ -193,7 +193,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
     if (!alreadyDismissed) {
       try {
         await dismissInference.mutateAsync({
-          householdId: task.householdId,
+          token: token ?? "",
           inferenceType: inferenceKey,
           label: task.title,
         });

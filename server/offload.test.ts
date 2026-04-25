@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
@@ -19,7 +19,7 @@ vi.mock("./db", async () => {
     createHouseholdMember: vi.fn().mockResolvedValue({
       id: 1,
       householdId: 1,
-      userId: 1,
+      userId: null,
       displayName: "Sarah",
       role: "primary",
       googleCalendarToken: null,
@@ -34,21 +34,22 @@ vi.mock("./db", async () => {
       updatedAt: new Date(),
     }),
     getMembersByHousehold: vi.fn().mockResolvedValue([
-      { id: 1, householdId: 1, userId: 1, displayName: "Sarah", role: "primary", googleCalendarToken: null, createdAt: new Date() },
-      { id: 2, householdId: 1, userId: 2, displayName: "James", role: "partner", googleCalendarToken: null, createdAt: new Date() },
+      { id: 1, householdId: 1, userId: null, displayName: "Sarah", role: "primary", googleCalendarToken: null, createdAt: new Date() },
+      { id: 2, householdId: 1, userId: null, displayName: "James", role: "partner", googleCalendarToken: null, createdAt: new Date() },
     ]),
-    getMemberByUserId: vi.fn().mockResolvedValue({
-      id: 1, householdId: 1, userId: 1, displayName: "Sarah", role: "primary", googleCalendarToken: null, createdAt: new Date(),
-    }),
+    getMemberByUserId: vi.fn().mockResolvedValue(null),
+    getMemberById: vi.fn().mockResolvedValue(
+      { id: 1, householdId: 1, userId: null, displayName: "Sarah", role: "primary", googleCalendarToken: null, createdAt: new Date() }
+    ),
     getHouseholdById: vi.fn().mockResolvedValue({
       id: 1, name: "Test Household", shareToken: "test-token-abc", imbalanceThreshold: 0.6, createdAt: new Date(), updatedAt: new Date(),
     }),
     getTasksByHousehold: vi.fn().mockResolvedValue([
-      { id: 1, householdId: 1, ownerMemberId: 1, title: "Buy present", status: "open", urgency: "medium", deadline: null, category: "social", subject: "kids", isRecurring: false, lowConfidence: false, createdAt: new Date() },
-      { id: 2, householdId: 1, ownerMemberId: 2, title: "Book dentist", status: "open", urgency: "low", deadline: null, category: "medical", subject: "kids", isRecurring: false, lowConfidence: false, createdAt: new Date() },
+      { id: 1, householdId: 1, ownerMemberId: 1, title: "Buy present", status: "open", urgency: "medium", deadline: null, category: "social", subject: "kids", isRecurring: false, lowConfidence: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: 2, householdId: 1, ownerMemberId: 2, title: "Book dentist", status: "open", urgency: "low", deadline: null, category: "medical", subject: "kids", isRecurring: false, lowConfidence: false, createdAt: new Date(), updatedAt: new Date() },
     ]),
     getTasksByMember: vi.fn().mockResolvedValue([
-      { id: 1, householdId: 1, ownerMemberId: 1, title: "Buy present", status: "open", urgency: "medium", deadline: null, category: "social", subject: "kids", isRecurring: false, lowConfidence: false, createdAt: new Date() },
+      { id: 1, householdId: 1, ownerMemberId: 1, title: "Buy present", status: "open", urgency: "medium", deadline: null, category: "social", subject: "kids", isRecurring: false, lowConfidence: false, createdAt: new Date(), updatedAt: new Date() },
     ]),
     computeLoadScore: vi.fn().mockReturnValue(5),
     createTask: vi.fn().mockResolvedValue({ id: 3, title: "New task", status: "open" }),
@@ -88,41 +89,17 @@ vi.mock("./storage", () => ({
 
 // ─── Test context helpers ─────────────────────────────────────────────────────
 
-function makeCtx(userId = 1): TrpcContext {
+function makeCtx(): TrpcContext {
   return {
-    user: {
-      id: userId,
-      openId: "test-open-id",
-      email: "test@example.com",
-      name: "Sarah",
-      loginMethod: "manus",
-      role: "user",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
-    },
+    user: null,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
   };
 }
 
+const TEST_TOKEN = "test-token-abc";
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
-
-describe("auth", () => {
-  it("returns current user from auth.me", async () => {
-    const caller = appRouter.createCaller(makeCtx());
-    const user = await caller.auth.me();
-    expect(user).toBeTruthy();
-    expect(user?.name).toBe("Sarah");
-  });
-
-  it("clears cookie on logout", async () => {
-    const ctx = makeCtx();
-    const caller = appRouter.createCaller(ctx);
-    const result = await caller.auth.logout();
-    expect(result.success).toBe(true);
-  });
-});
 
 describe("household.create", () => {
   it("creates a household and primary member", async () => {
@@ -137,8 +114,8 @@ describe("household.create", () => {
 describe("household.getByToken", () => {
   it("returns household and members for a valid token", async () => {
     const caller = appRouter.createCaller(makeCtx());
-    const result = await caller.household.getByToken({ token: "test-token-abc" });
-    expect(result.household.shareToken).toBe("test-token-abc");
+    const result = await caller.household.getByToken({ token: TEST_TOKEN });
+    expect(result.household.shareToken).toBe(TEST_TOKEN);
     expect(result.members).toHaveLength(2);
   });
 });
@@ -147,7 +124,7 @@ describe("extract.fromText", () => {
   it("extracts events and tasks from text", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.extract.fromText({
-      householdId: 1,
+      token: TEST_TOKEN,
       text: "Mia is invited to Lily's birthday party on 14 June at 3pm",
     });
     expect(result.events).toHaveLength(1);
@@ -159,13 +136,13 @@ describe("extract.fromText", () => {
 describe("tasks", () => {
   it("lists all tasks for a household", async () => {
     const caller = appRouter.createCaller(makeCtx());
-    const tasks = await caller.tasks.list({ householdId: 1 });
+    const tasks = await caller.tasks.list({ token: TEST_TOKEN });
     expect(tasks).toHaveLength(2);
   });
 
-  it("lists only my tasks", async () => {
+  it("lists only tasks for a specific member", async () => {
     const caller = appRouter.createCaller(makeCtx());
-    const tasks = await caller.tasks.listMine({ householdId: 1 });
+    const tasks = await caller.tasks.listMine({ token: TEST_TOKEN, memberId: 1 });
     expect(tasks).toHaveLength(1);
     expect(tasks[0].ownerMemberId).toBe(1);
   });
@@ -173,7 +150,7 @@ describe("tasks", () => {
   it("creates a task", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const task = await caller.tasks.create({
-      householdId: 1,
+      token: TEST_TOKEN,
       title: "New task",
       category: "general",
       subject: "any",
@@ -186,8 +163,8 @@ describe("tasks", () => {
   it("updates a task status to done", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.tasks.update({
+      token: TEST_TOKEN,
       taskId: 1,
-      householdId: 1,
       status: "done",
     });
     expect(result.success).toBe(true);
@@ -195,7 +172,7 @@ describe("tasks", () => {
 
   it("deletes a task", async () => {
     const caller = appRouter.createCaller(makeCtx());
-    const result = await caller.tasks.delete({ taskId: 1, householdId: 1 });
+    const result = await caller.tasks.delete({ token: TEST_TOKEN, taskId: 1 });
     expect(result.success).toBe(true);
   });
 });
@@ -203,7 +180,7 @@ describe("tasks", () => {
 describe("load.scores", () => {
   it("returns load scores for all members", async () => {
     const caller = appRouter.createCaller(makeCtx());
-    const result = await caller.load.scores({ householdId: 1 });
+    const result = await caller.load.scores({ token: TEST_TOKEN });
     expect(result.scores).toHaveLength(2);
     expect(typeof result.imbalanced).toBe("boolean");
     expect(result.threshold).toBe(0.6);
@@ -214,7 +191,7 @@ describe("routing", () => {
   it("suggests routing for a task", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.routing.suggest({
-      householdId: 1,
+      token: TEST_TOKEN,
       taskTitle: "School trip payment",
       category: "school",
       subject: "kids",
@@ -226,7 +203,7 @@ describe("routing", () => {
   it("learns a new routing rule", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.routing.learnRule({
-      householdId: 1,
+      token: TEST_TOKEN,
       category: "insurance",
       subject: "cars",
       assigneeMemberId: 2,

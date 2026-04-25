@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronRight, ChevronLeft, Home, Leaf } from "lucide-react";
+import { ChevronRight, ChevronLeft, Leaf } from "lucide-react";
 import { useHousehold } from "@/contexts/HouseholdContext";
 
 const CATEGORIES = [
@@ -27,7 +26,7 @@ type Assignment = "primary" | "partner" | "ask";
 
 export default function Onboarding() {
   const [, navigate] = useLocation();
-  const { setHousehold, setMembers, setMyMemberId } = useHousehold();
+  const { setHousehold, setMembers, persistIdentity } = useHousehold();
 
   const [step, setStep] = useState(1);
   const [primaryName, setPrimaryName] = useState("");
@@ -37,7 +36,7 @@ export default function Onboarding() {
     Object.fromEntries(CATEGORIES.map((c) => [c.id, "ask"]))
   );
   const [exceptionsText, setExceptionsText] = useState("");
-  const [householdId, setHouseholdId] = useState<number | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [primaryMemberId, setPrimaryMemberId] = useState<number | null>(null);
   const [partnerMemberId, setPartnerMemberId] = useState<number | null>(null);
 
@@ -45,7 +44,6 @@ export default function Onboarding() {
   const saveRhythm = trpc.onboarding.saveRhythm.useMutation();
   const saveDomain = trpc.onboarding.saveDomainAssignment.useMutation();
   const saveExceptions = trpc.onboarding.saveExceptions.useMutation();
-  const getMine = trpc.household.getMine.useQuery(undefined, { enabled: false });
 
   const isLoading =
     createHousehold.isPending ||
@@ -62,10 +60,14 @@ export default function Onboarding() {
     }
     try {
       const result = await createHousehold.mutateAsync({ primaryName, partnerName });
-      setHouseholdId(result.household.id);
+      const hToken = result.household.shareToken;
+      setToken(hToken);
       setPrimaryMemberId(result.primaryMember.id);
+      setPartnerMemberId(result.partnerMember.id);
       setHousehold(result.household as any);
-      setMyMemberId(result.primaryMember.id);
+      setMembers([result.primaryMember as any, result.partnerMember as any]);
+      // Persist identity as the primary carer on this device
+      persistIdentity(hToken, result.primaryMember.id);
       setStep(2);
     } catch (e: any) {
       toast.error(e.message ?? "Failed to create household");
@@ -73,15 +75,10 @@ export default function Onboarding() {
   }
 
   async function handleStep2() {
-    if (!householdId) return;
+    if (!token) return;
     if (rhythmText.trim()) {
       try {
-        await saveRhythm.mutateAsync({
-          householdId,
-          rawText: rhythmText,
-          primaryName,
-          partnerName,
-        });
+        await saveRhythm.mutateAsync({ token, rawText: rhythmText, primaryName, partnerName });
       } catch {
         // Non-blocking — rhythm is optional
       }
@@ -90,19 +87,17 @@ export default function Onboarding() {
   }
 
   async function handleStep3() {
-    if (!householdId || !primaryMemberId) return;
-    // We need partner member ID — use a placeholder for now (partner hasn't joined yet)
-    // Save assignments with primary member only; partner rules will be learned
+    if (!token || !primaryMemberId || !partnerMemberId) return;
     try {
       const assignmentList = CATEGORIES.map((c) => ({
         category: c.id,
         assignee: assignments[c.id] as Assignment,
       }));
       await saveDomain.mutateAsync({
-        householdId,
+        token,
         assignments: assignmentList,
         primaryMemberId,
-        partnerMemberId: primaryMemberId, // partner hasn't joined yet — will be updated
+        partnerMemberId,
       });
       setStep(4);
     } catch (e: any) {
@@ -111,16 +106,16 @@ export default function Onboarding() {
   }
 
   async function handleStep4() {
-    if (!householdId || !primaryMemberId) return;
+    if (!token || !primaryMemberId || !partnerMemberId) return;
     if (exceptionsText.trim()) {
       try {
         await saveExceptions.mutateAsync({
-          householdId,
+          token,
           exceptionsText,
           primaryName,
           partnerName,
           primaryMemberId,
-          partnerMemberId: primaryMemberId,
+          partnerMemberId,
         });
       } catch {
         // Non-blocking
@@ -180,6 +175,7 @@ export default function Onboarding() {
                       placeholder="e.g. Sarah"
                       value={primaryName}
                       onChange={(e) => setPrimaryName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleStep1()}
                       className="text-base"
                     />
                   </div>
@@ -189,6 +185,7 @@ export default function Onboarding() {
                       placeholder="e.g. James"
                       value={partnerName}
                       onChange={(e) => setPartnerName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleStep1()}
                       className="text-base"
                     />
                   </div>
@@ -220,7 +217,7 @@ export default function Onboarding() {
               <Card>
                 <CardContent className="pt-6">
                   <Textarea
-                    placeholder={`e.g. ${primaryName || "I"} always do school drop-off. ${partnerName || "Partner"} does pick-up. Julian has Taekwondo on Wednesdays and Saturdays. Juniper has ballet on Saturdays and Sundays. Julian has water play on Mondays, Juniper on Wednesdays.`}
+                    placeholder={`e.g. ${primaryName || "I"} always do school drop-off. ${partnerName || "Partner"} does pick-up. Julian has Taekwondo on Wednesdays and Saturdays. Juniper has ballet on Saturdays and Sundays.`}
                     value={rhythmText}
                     onChange={(e) => setRhythmText(e.target.value)}
                     className="min-h-[140px] text-base resize-none"
@@ -253,7 +250,7 @@ export default function Onboarding() {
                   Set default ownership for each area. You can always override individual tasks.
                 </p>
               </div>
-              <div className="flex gap-2 text-xs justify-center">
+              <div className="flex gap-2 text-xs justify-center flex-wrap">
                 <span className={`px-2 py-1 rounded border ${assignmentColors.primary}`}>
                   {primaryName || "You"}
                 </span>
@@ -275,17 +272,13 @@ export default function Onboarding() {
                           <button
                             key={a}
                             onClick={() => setAssignment(cat.id, a)}
-                            className={`px-2.5 py-1 rounded text-xs font-medium border transition-all ${
+                            className={`px-2.5 py-1 rounded text-xs border transition-all ${
                               assignments[cat.id] === a
-                                ? assignmentColors[a] + " shadow-sm"
-                                : "bg-transparent text-muted-foreground border-transparent hover:border-border"
+                                ? assignmentColors[a] + " font-semibold"
+                                : "bg-background text-muted-foreground border-border hover:border-primary/40"
                             }`}
                           >
-                            {a === "primary"
-                              ? primaryName || "Me"
-                              : a === "partner"
-                              ? partnerName || "Partner"
-                              : "Ask"}
+                            {a === "primary" ? primaryName || "Me" : a === "partner" ? partnerName || "Partner" : "Ask"}
                           </button>
                         ))}
                       </div>
@@ -313,19 +306,20 @@ export default function Onboarding() {
                 <div className="text-4xl mb-3">✏️</div>
                 <h1 className="text-2xl font-semibold text-foreground">Any exceptions?</h1>
                 <p className="text-muted-foreground">
-                  Describe any nuances the defaults don't capture. Offload will learn from these.
+                  Describe any nuances to the rules above. For example: "James handles car insurance
+                  but I handle mine and the kids'." Offload will learn the rest over time.
                 </p>
               </div>
               <Card>
                 <CardContent className="pt-6">
                   <Textarea
-                    placeholder={`e.g. ${partnerName || "Partner"} handles car insurance and pet insurance. ${primaryName || "I"} handle my own and the kids' medical, except dental which is with ${partnerName || "Partner"}'s dentist.`}
+                    placeholder="e.g. James handles insurance for himself and the cats, but I handle mine and the kids'. Dental for the kids is James because they go to his dentist."
                     value={exceptionsText}
                     onChange={(e) => setExceptionsText(e.target.value)}
-                    className="min-h-[140px] text-base resize-none"
+                    className="min-h-[120px] text-base resize-none"
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    Optional — Offload will ask when it's unsure and learn over time.
+                    Optional — skip if you want Offload to ask and learn as you go.
                   </p>
                 </CardContent>
               </Card>

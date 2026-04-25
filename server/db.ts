@@ -106,17 +106,18 @@ export async function updateHouseholdThreshold(householdId: number, threshold: n
 
 export async function createHouseholdMember(
   householdId: number,
-  userId: number,
+  userId: number | null,
   displayName: string,
   role: "primary" | "partner"
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  await db.insert(householdMembers).values({ householdId, userId, displayName, role });
+  await db.insert(householdMembers).values({ householdId, userId: userId ?? undefined, displayName, role });
   const result = await db
     .select()
     .from(householdMembers)
-    .where(and(eq(householdMembers.householdId, householdId), eq(householdMembers.userId, userId)))
+    .where(eq(householdMembers.householdId, householdId))
+    .orderBy(desc(householdMembers.createdAt))
     .limit(1);
   return result[0];
 }
@@ -127,13 +128,14 @@ export async function getMembersByHousehold(householdId: number) {
   return db.select().from(householdMembers).where(eq(householdMembers.householdId, householdId));
 }
 
-export async function getMemberByUserId(userId: number, householdId: number) {
+export async function getMemberByUserId(userId: number | null, householdId: number) {
+  if (userId === null) return undefined;
   const db = await getDb();
   if (!db) return undefined;
   const result = await db
     .select()
     .from(householdMembers)
-    .where(and(eq(householdMembers.userId, userId), eq(householdMembers.householdId, householdId)))
+    .where(and(eq(householdMembers.householdId, householdId), eq(householdMembers.id, userId)))
     .limit(1);
   return result[0];
 }

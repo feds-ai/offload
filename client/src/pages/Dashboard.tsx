@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { useHousehold } from "@/contexts/HouseholdContext";
 import InputBar from "@/components/InputBar";
 import TaskCard from "@/components/TaskCard";
@@ -9,7 +8,7 @@ import LoadScoreBar from "@/components/LoadScoreBar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Leaf, Share2, LogOut, Settings, Copy, Check } from "lucide-react";
+import { Leaf, Share2, Settings, Copy, Check, User } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -40,38 +39,51 @@ interface Task {
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const { user, loading, logout } = useAuth();
-  const { household, members, myMemberId, setHousehold, setMembers, setMyMemberId } = useHousehold();
+  const {
+    household,
+    members,
+    myMemberId,
+    token,
+    setHousehold,
+    setMembers,
+    persistIdentity,
+    needsIdentityCheck,
+    myMember,
+  } = useHousehold();
   const [view, setView] = useState<TaskView>("household");
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [identityOpen, setIdentityOpen] = useState(false);
 
-  const { data: householdData, isLoading: householdLoading } = trpc.household.getMine.useQuery(
-    undefined,
-    { enabled: !!user }
+  // Load household data from token
+  const { data: householdData, isLoading: householdLoading } = trpc.household.getByToken.useQuery(
+    { token: token ?? "" },
+    { enabled: !!token }
   );
 
   const { data: allTasks, refetch: refetchAll } = trpc.tasks.list.useQuery(
-    { householdId: household?.id ?? 0 },
-    { enabled: !!household?.id }
+    { token: token ?? "" },
+    { enabled: !!token && !!household }
   );
 
+  // Sync household data into context
   useEffect(() => {
     if (householdData) {
       setHousehold(householdData.household as any);
       setMembers(householdData.members as any);
-      setMyMemberId(householdData.myMemberId);
     }
   }, [householdData]);
 
+  // Redirect to onboarding if no token
   useEffect(() => {
-    if (!loading && !user) navigate("/");
-  }, [loading, user]);
+    if (!token) navigate("/onboarding");
+  }, [token]);
 
+  // Show identity check if needed
   useEffect(() => {
-    if (!householdLoading && !householdData && user) navigate("/onboarding");
-  }, [householdLoading, householdData, user]);
+    if (needsIdentityCheck) setIdentityOpen(true);
+  }, [needsIdentityCheck]);
 
   function handleRefresh() {
     setRefreshKey((k) => k + 1);
@@ -87,7 +99,6 @@ export default function Dashboard() {
     toast.success("Link copied!");
   }
 
-  const myMember = members.find((m) => m.id === myMemberId);
   const partnerMember = members.find((m) => m.id !== myMemberId);
 
   const openTasks = (allTasks ?? []).filter((t: Task) => t.status === "open");
@@ -116,7 +127,7 @@ export default function Dashboard() {
   const visibleSnoozed = filterByView(snoozedTasks);
   const visibleDone = filterByView(doneTasks).slice(0, 10);
 
-  if (loading || householdLoading) {
+  if (!token || householdLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -135,9 +146,9 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <Leaf className="w-5 h-5 text-primary" />
             <span className="font-semibold text-foreground">Offload</span>
-            {household && (
-              <Badge variant="secondary" className="text-xs hidden sm:inline-flex">
-                {household.name}
+            {myMember && (
+              <Badge variant="secondary" className="text-xs">
+                {myMember.displayName}
               </Badge>
             )}
           </div>
@@ -154,10 +165,10 @@ export default function Dashboard() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={logout}
+              onClick={() => navigate("/settings")}
               className="text-muted-foreground"
             >
-              <LogOut className="w-4 h-4" />
+              <Settings className="w-4 h-4" />
             </Button>
           </div>
         </div>
@@ -200,7 +211,6 @@ export default function Dashboard() {
           </TabsList>
 
           <TabsContent value={view} className="mt-4 space-y-6">
-            {/* Open tasks */}
             {visibleOpen.length > 0 && (
               <section className="space-y-2">
                 <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -214,7 +224,6 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* Snoozed tasks */}
             {visibleSnoozed.length > 0 && (
               <section className="space-y-2">
                 <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -228,7 +237,6 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* Done tasks */}
             {visibleDone.length > 0 && (
               <section className="space-y-2">
                 <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -242,13 +250,24 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* Empty state */}
             {visibleOpen.length === 0 && visibleSnoozed.length === 0 && visibleDone.length === 0 && (
               <div className="text-center py-16 space-y-3">
-                <div className="text-5xl">🌿</div>
-                <p className="text-base font-medium text-foreground">All clear!</p>
+                <div className="text-5xl">
+                  {view === "mine" ? "🌱" : view === "partner" ? "✨" : "🌿"}
+                </div>
+                <p className="text-base font-medium text-foreground">
+                  {view === "mine"
+                    ? "Nothing on your plate"
+                    : view === "partner"
+                    ? `${partnerMember?.displayName ?? "Partner"} is all clear`
+                    : "All clear!"}
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  Add something above to get started.
+                  {view === "household"
+                    ? "Add something above to get started."
+                    : view === "mine"
+                    ? "Your tasks will appear here once added."
+                    : "Their tasks will appear here once assigned."}
                 </p>
               </div>
             )}
@@ -284,6 +303,37 @@ export default function Dashboard() {
           <Button onClick={copyShareLink} className="w-full">
             {copied ? "Copied!" : "Copy link"}
           </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Identity check dialog */}
+      <Dialog open={identityOpen} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5 text-primary" />
+              Who are you?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Pick your name so Offload knows whose view to show.
+          </p>
+          <div className="space-y-2 pt-2">
+            {members.map((m) => (
+              <Button
+                key={m.id}
+                variant="outline"
+                className="w-full justify-start gap-3"
+                onClick={() => {
+                  if (token) persistIdentity(token, m.id);
+                  setIdentityOpen(false);
+                }}
+              >
+                <span className="text-lg">{m.role === "primary" ? "🌿" : "🌱"}</span>
+                {m.displayName}
+              </Button>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

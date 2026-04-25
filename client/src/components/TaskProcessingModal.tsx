@@ -81,7 +81,7 @@ export default function TaskProcessingModal({
   result,
   onConfirm,
 }: TaskProcessingModalProps) {
-  const { household, members, myMemberId } = useHousehold();
+  const { household, members, myMemberId, token } = useHousehold();
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
   const [removedTasks, setRemovedTasks] = useState<Set<number>>(new Set());
   const [taskOwners, setTaskOwners] = useState<Record<number, number>>({});
@@ -100,7 +100,7 @@ export default function TaskProcessingModal({
   // Fetch routing suggestions for each task
   const routingSuggestions = trpc.routing.suggestBatch.useQuery(
     {
-      householdId: household?.id ?? 0,
+      token: token ?? "",
       tasks: (result?.tasks ?? []).map((t, i) => ({
         index: i,
         title: t.title,
@@ -109,12 +109,12 @@ export default function TaskProcessingModal({
         qualifier: t.qualifier,
       })),
     },
-    { enabled: !!household?.id && !!result && result.tasks.length > 0 }
+    { enabled: !!token && !!result && result.tasks.length > 0 }
   );
 
   const activeTasks = result ? result.tasks.filter((_, i) => !removedTasks.has(i)) : [];
 
-  if (!result || !household) return null;
+  if (!result || !token) return null;
 
   function toggleExpand(i: number) {
     setExpandedTasks((prev) => {
@@ -143,14 +143,14 @@ export default function TaskProcessingModal({
   }
 
   async function handleConfirm() {
-    if (!household || !result) return;
+    if (!token || !result) return;
     setSaving(true);
     try {
       // Save events
       const savedEvents: Array<{ id: number; title: string }> = [];
       for (const ev of result!.events) {
         const saved = await createEvent.mutateAsync({
-          householdId: household.id,
+          token,
           title: ev.title,
           description: ev.description,
           location: ev.location,
@@ -172,7 +172,7 @@ export default function TaskProcessingModal({
         const matchingEvent = savedEvents[0]; // simplistic — link first event
 
         await createTask.mutateAsync({
-          householdId: household.id,
+          token,
           eventId: matchingEvent?.id,
           title: task.title,
           description: task.description,

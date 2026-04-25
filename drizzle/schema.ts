@@ -43,7 +43,7 @@ export type Household = typeof households.$inferSelect;
 export const householdMembers = mysqlTable("household_members", {
   id: int("id").autoincrement().primaryKey(),
   householdId: int("householdId").notNull(),
-  userId: int("userId").notNull(),
+  userId: int("userId"),
   displayName: varchar("displayName", { length: 128 }).notNull(),
   role: mysqlEnum("role", ["primary", "partner"]).default("primary").notNull(),
   googleCalendarToken: text("googleCalendarToken"), // encrypted JSON

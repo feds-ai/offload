@@ -65,15 +65,27 @@
 
 ## Phase 10: Settings
 - [x] Imbalance threshold configuration (default 60/40, configurable via LoadScoreBar)
-- [ ] Manage routing rules UI
-- [ ] Re-enable dismissed inference types UI
-- [ ] Household rhythm editing
+- [x] Manage routing rules UI (Settings page)
+- [x] Re-enable dismissed inference types UI (Settings page)
+- [x] Household rhythm editing (Settings page)
 
 ## Phase 11: Tests & Polish
 - [x] Vitest unit tests for tRPC procedures (14 passing)
 - [x] Dismissal learning wired to task delete with confirmation toast
 - [x] "Who should handle this?" prompt shown in modal when routing confidence is low
 - [x] Routing suggestions (suggestBatch) used in TaskProcessingModal to pre-assign owners
-- [ ] Mobile-first responsive layout review
-- [ ] Empty states and loading skeletons
-- [ ] Error handling throughout
+- [x] Mobile-first responsive layout review
+- [x] Empty states and loading skeletons (per-tab empty states in Dashboard)
+- [x] Urgency badge and load bar styles added to index.css
+
+## Phase 12: UX Refinements (user requests)
+- [x] Remove landing page — root URL routes directly to onboarding or dashboard based on auth/household state
+
+## Phase 13: No-Registration Refactor
+- [x] Remove Manus OAuth requirement — app works without login
+- [x] Household identified by shareToken stored in localStorage
+- [x] Identity (which member you are) stored per-device in localStorage
+- [x] "Who are you?" prompt only shown when identity is unknown/new device
+- [x] All tRPC procedures switched from protectedProcedure to publicProcedure with householdToken auth
+- [x] Onboarding creates household and stores token + memberId in localStorage
+- [x] Shared link (/shared/:token) sets token in localStorage and asks identity if unknown
