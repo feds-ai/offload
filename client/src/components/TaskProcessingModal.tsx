@@ -202,30 +202,44 @@ export default function TaskProcessingModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Review what Offload found
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-0 gap-0">
+        {/* Decorative header */}
+        <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-br from-teal-50/80 via-white/70 to-emerald-50/60 px-5 pt-5 pb-4 border-b border-border/40">
+          <div
+            aria-hidden
+            className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-20"
+            style={{ background: "radial-gradient(circle, oklch(0.70 0.12 185) 0%, transparent 70%)" }}
+          />
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2.5 relative">
+              <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-primary" />
+              </div>
+              <span className="text-base font-bold">Review what Offload found</span>
+            </DialogTitle>
+          </DialogHeader>
+        </div>
+
+        <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[calc(90vh-8rem)]">
 
         {/* Transcript (voice only) */}
         {result.transcript && (
-          <div className="bg-muted/50 rounded-lg px-3 py-2 text-xs text-muted-foreground italic">
-            "{result.transcript}"
+          <div className="bg-muted/40 rounded-xl px-3.5 py-2.5 text-xs text-muted-foreground italic border border-border/40 flex gap-2 items-start">
+            <span className="text-base leading-none mt-0.5">🎙</span>
+            <span>"{result.transcript}"</span>
           </div>
         )}
 
         {/* Events */}
         {result.events.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Events → both calendars
-            </p>
+            <div className="section-label">
+              <Calendar className="w-3 h-3" />
+              Events · both calendars
+            </div>
             {result.events.map((ev, i) => (
-              <Card key={i} className="border-primary/20 bg-primary/5 shadow-none">
-                <CardContent className="py-3 px-4">
+              <div key={i} className="card-glass rounded-xl border-primary/20 bg-primary/5">
+                <div className="py-3 px-4">
                   <div className="flex items-start gap-2">
                     <Calendar className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                     <div className="min-w-0">
@@ -247,8 +261,8 @@ export default function TaskProcessingModal({
                       )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -277,9 +291,10 @@ export default function TaskProcessingModal({
         {/* Tasks */}
         {result.tasks.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Tasks ({activeTasks.length} active)
-            </p>
+            <div className="section-label">
+              <CheckCircle2 className="w-3 h-3" />
+              Tasks · {activeTasks.length} active
+            </div>
             {result.tasks.map((task, i) => {
               if (removedTasks.has(i)) return null;
               const expanded = expandedTasks.has(i);
@@ -287,8 +302,8 @@ export default function TaskProcessingModal({
               const owner = members.find((m) => m.id === ownerId);
 
               return (
-                <Card key={i} className="shadow-none border-border">
-                  <CardContent className="py-3 px-4">
+                <div key={i} className="card-elevated rounded-xl">
+                  <div className="py-3 px-4">
                     {/* Compact row */}
                     <div className="flex items-start gap-2">
                       <span className="text-base shrink-0 mt-0.5">
@@ -422,8 +437,8 @@ export default function TaskProcessingModal({
                         )}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -436,7 +451,9 @@ export default function TaskProcessingModal({
           </div>
         )}
 
-        <DialogFooter className="gap-2">
+        </div>{/* end scroll wrapper */}
+
+        <DialogFooter className="gap-2 px-5 pb-5 pt-3 border-t border-border/40">
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>

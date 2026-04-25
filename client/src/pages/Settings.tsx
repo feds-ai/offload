@@ -159,28 +159,39 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      {/* Decorative blobs */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          background: `
+            radial-gradient(ellipse 50% 35% at 0% 0%, oklch(0.88 0.07 165 / 0.35) 0%, transparent 60%),
+            radial-gradient(ellipse 40% 30% at 100% 100%, oklch(0.86 0.08 185 / 0.25) 0%, transparent 55%)
+          `,
+        }}
+      />
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/50">
+      <header className="sticky top-0 z-10 bg-card/80 backdrop-blur-md border-b border-border/50 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="hover:bg-primary/8">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-2">
-            <Leaf className="h-4 w-4 text-primary" />
-            <span className="font-semibold text-foreground">Settings</span>
+            <div className="w-6 h-6 rounded-lg bg-primary flex items-center justify-center">
+              <Leaf className="h-3.5 w-3.5 text-primary-foreground" />
+            </div>
+            <span className="font-bold text-foreground tracking-tight">Settings</span>
           </div>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-8">
+      <main className="relative z-10 max-w-2xl mx-auto px-4 py-6 space-y-8">
 
         {/* ─── Identity ─────────────────────────────────────────────────────── */}
         <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-            Your Identity
-          </h2>
-          <div className="bg-card rounded-2xl border border-border/50 p-4 space-y-3">
+          <div className="section-label mb-3">Your Identity</div>
+          <div className="card-glass rounded-2xl p-4 space-y-3">
             <p className="text-sm text-muted-foreground">
               You are currently identified as{" "}
               <span className="font-semibold text-foreground">
@@ -210,13 +221,11 @@ export default function Settings() {
 
         {/* ─── Imbalance Threshold ──────────────────────────────────────────── */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <Scale className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Imbalance Signal Threshold
-            </h2>
+          <div className="section-label mb-3">
+            <Scale className="h-3.5 w-3.5 text-primary" />
+            Imbalance Signal Threshold
           </div>
-          <div className="bg-card rounded-2xl border border-border/50 p-4 space-y-4">
+          <div className="card-glass rounded-2xl p-4 space-y-4">
             <p className="text-sm text-muted-foreground">
               Show the imbalance signal when one person carries more than{" "}
               <span className="font-semibold text-foreground">
@@ -250,13 +259,11 @@ export default function Settings() {
 
         {/* ─── Routing Rules ────────────────────────────────────────────────── */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <Route className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Routing Rules
-            </h2>
+          <div className="section-label mb-3">
+            <Route className="h-3.5 w-3.5 text-primary" />
+            Routing Rules
           </div>
-          <div className="bg-card rounded-2xl border border-border/50 divide-y divide-border/50">
+          <div className="card-glass rounded-2xl divide-y divide-border/40">
             {!rules || rules.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground text-center">
                 No routing rules yet. They'll be learned as you use Offload.
@@ -328,13 +335,11 @@ export default function Settings() {
 
         {/* ─── Dismissed Suggestion Types ───────────────────────────────────── */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <RefreshCw className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Dismissed Suggestions
-            </h2>
+          <div className="section-label mb-3">
+            <RefreshCw className="h-3.5 w-3.5 text-primary" />
+            Dismissed Suggestions
           </div>
-          <div className="bg-card rounded-2xl border border-border/50 divide-y divide-border/50">
+          <div className="card-glass rounded-2xl divide-y divide-border/40">
             {!dismissed || dismissed.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground text-center">
                 No dismissed suggestion types. When you dismiss a suggestion three times, it'll appear here so you can re-enable it.
@@ -370,13 +375,11 @@ export default function Settings() {
 
         {/* ─── Household Rhythm ─────────────────────────────────────────────── */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <RefreshCw className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Household Rhythm
-            </h2>
+          <div className="section-label mb-3">
+            <RefreshCw className="h-3.5 w-3.5 text-primary" />
+            Household Rhythm
           </div>
-          <div className="bg-card rounded-2xl border border-border/50 p-4 space-y-3">
+          <div className="card-glass rounded-2xl p-4 space-y-3">
             <p className="text-sm text-muted-foreground">
               Describe your weekly schedule in plain language. Offload uses this to infer preparation reminders automatically.
             </p>
@@ -420,13 +423,11 @@ export default function Settings() {
 
         {/* ─── Google Calendar ──────────────────────────────────────────────── */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <Calendar className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Google Calendar
-            </h2>
+          <div className="section-label mb-3">
+            <Calendar className="h-3.5 w-3.5 text-primary" />
+            Google Calendar
           </div>
-          <div className="bg-card rounded-2xl border border-border/50 p-4 space-y-3">
+          <div className="card-glass rounded-2xl p-4 space-y-3">
             {calendarAuthData?.configured ? (
               <>
                 <p className="text-sm text-muted-foreground">
@@ -481,10 +482,8 @@ export default function Settings() {
 
         {/* ─── Household info ───────────────────────────────────────────────── */}
         <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-            Household
-          </h2>
-          <div className="bg-card rounded-2xl border border-border/50 p-4 space-y-2">
+          <div className="section-label mb-3">Household</div>
+          <div className="card-glass rounded-2xl p-4 space-y-2">
             <p className="text-sm text-foreground font-medium">{household?.name}</p>
             <p className="text-xs text-muted-foreground font-mono break-all">
               Share token: {household?.shareToken}

@@ -22,6 +22,51 @@ function initials(name: string) {
     .slice(0, 2);
 }
 
+/** Circular ring SVG for avatar decoration */
+function AvatarRing({
+  pct,
+  color,
+  size = 48,
+}: {
+  pct: number;
+  color: string;
+  size?: number;
+}) {
+  const r = (size - 6) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="absolute inset-0"
+      style={{ transform: "rotate(-90deg)" }}
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={3}
+        className="text-black/5"
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={3}
+        strokeDasharray={`${dash} ${circ}`}
+        strokeLinecap="round"
+        style={{ transition: "stroke-dasharray 0.8s ease-out" }}
+      />
+    </svg>
+  );
+}
+
 export default function LoadScoreBar() {
   const { household, token } = useHousehold();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -60,28 +105,49 @@ export default function LoadScoreBar() {
     });
   }
 
+  const primaryColor = imbalanced && primaryPct > partnerPct
+    ? "oklch(0.65 0.15 50)"
+    : "oklch(0.50 0.13 185)";
+  const partnerColor = imbalanced && partnerPct > primaryPct
+    ? "oklch(0.65 0.15 50)"
+    : "oklch(0.62 0.10 155)";
+
   return (
     <>
       <div
-        className={`rounded-2xl overflow-hidden border transition-all ${
-          imbalanced ? "border-orange-200" : "border-border"
+        className={`rounded-2xl overflow-hidden transition-all ${
+          imbalanced
+            ? "shadow-[0_0_0_1px_oklch(0.8_0.12_50/0.4),0_4px_16px_oklch(0_0_0/0.07)]"
+            : "shadow-[0_0_0_1px_oklch(0.88_0.018_175/0.6),0_4px_16px_oklch(0_0_0/0.06)]"
         }`}
       >
-        {/* Gradient header band */}
+        {/* Gradient header */}
         <div
-          className={`px-4 pt-4 pb-3 ${
+          className={`px-5 pt-5 pb-4 relative overflow-hidden ${
             imbalanced
-              ? "bg-gradient-to-br from-orange-50 to-amber-50"
-              : "bg-gradient-to-br from-teal-50/60 to-emerald-50/40"
+              ? "bg-gradient-to-br from-orange-50 via-amber-50/80 to-orange-50/60"
+              : "bg-gradient-to-br from-teal-50/80 via-white/70 to-emerald-50/60"
           }`}
         >
-          <div className="flex items-center justify-between mb-3">
+          {/* Subtle decorative circle in corner */}
+          <div
+            aria-hidden
+            className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-20"
+            style={{
+              background: imbalanced
+                ? "radial-gradient(circle, oklch(0.75 0.15 50) 0%, transparent 70%)"
+                : "radial-gradient(circle, oklch(0.70 0.12 185) 0%, transparent 70%)",
+            }}
+          />
+
+          {/* Header row */}
+          <div className="flex items-center justify-between mb-4 relative">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 Mental Load
               </span>
               {imbalanced && (
-                <span className="inline-flex items-center gap-1 text-orange-600 text-xs font-medium bg-orange-100 px-2 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-orange-600 text-xs font-semibold bg-orange-100 px-2.5 py-0.5 rounded-full border border-orange-200/60">
                   <AlertTriangle className="w-3 h-3" />
                   Check in
                 </span>
@@ -89,19 +155,22 @@ export default function LoadScoreBar() {
             </div>
             <button
               onClick={() => setSettingsOpen(true)}
-              className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-black/5 transition-colors"
+              className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-black/5 transition-colors"
               title="Adjust threshold"
             >
-              <SlidersHorizontal className="w-4 h-4" />
+              <SlidersHorizontal className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {/* Avatar + percentage row */}
-          <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-4 mb-4 relative">
             {/* Primary person */}
-            <div className="flex items-center gap-2 flex-1">
-              <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                {primary ? initials(primary.member.displayName) : "?"}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="relative w-12 h-12 shrink-0">
+                <AvatarRing pct={primaryPct} color={primaryColor} size={48} />
+                <div className="absolute inset-1.5 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold">
+                  {primary ? initials(primary.member.displayName) : "?"}
+                </div>
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-foreground truncate">
@@ -112,29 +181,28 @@ export default function LoadScoreBar() {
                 </p>
               </div>
               <span
-                className={`ml-auto text-lg font-bold tabular-nums ${
-                  imbalanced && primaryPct > partnerPct
-                    ? "text-orange-500"
-                    : "text-primary"
-                }`}
+                className="ml-auto text-2xl font-black tabular-nums leading-none"
+                style={{ color: primaryColor }}
               >
                 {primaryPct}%
               </span>
             </div>
 
-            <div className="w-px h-8 bg-border/60" />
+            {/* Divider */}
+            <div className="flex flex-col items-center gap-1 shrink-0">
+              <div className="w-px h-6 bg-border/50" />
+              <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">vs</span>
+              <div className="w-px h-6 bg-border/50" />
+            </div>
 
             {/* Partner */}
-            <div className="flex items-center gap-2 flex-1">
-              <span
-                className={`mr-auto text-lg font-bold tabular-nums ${
-                  imbalanced && partnerPct > primaryPct
-                    ? "text-orange-500"
-                    : "text-teal-600"
-                }`}
-              >
-                {partnerPct}%
-              </span>
+            <div className="flex items-center gap-3 flex-1 min-w-0 flex-row-reverse">
+              <div className="relative w-12 h-12 shrink-0">
+                <AvatarRing pct={partnerPct} color={partnerColor} size={48} />
+                <div className="absolute inset-1.5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-xs font-bold">
+                  {partner ? initials(partner.member.displayName) : "?"}
+                </div>
+              </div>
               <div className="min-w-0 text-right">
                 <p className="text-xs font-semibold text-foreground truncate">
                   {partner?.member.displayName ?? "—"}
@@ -143,20 +211,23 @@ export default function LoadScoreBar() {
                   {partner?.openCount ?? 0} task{(partner?.openCount ?? 0) !== 1 ? "s" : ""}
                 </p>
               </div>
-              <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-xs font-bold shrink-0">
-                {partner ? initials(partner.member.displayName) : "?"}
-              </div>
+              <span
+                className="mr-auto text-2xl font-black tabular-nums leading-none"
+                style={{ color: partnerColor }}
+              >
+                {partnerPct}%
+              </span>
             </div>
           </div>
 
           {/* Segmented load bar */}
-          <div className="h-2.5 rounded-full bg-black/5 overflow-hidden flex gap-0.5">
+          <div className="h-3 rounded-full bg-black/5 overflow-hidden flex gap-0.5 relative shadow-inner">
             <div
-              className="h-full rounded-l-full bg-primary transition-all duration-700 ease-out"
+              className="h-full rounded-l-full transition-all duration-700 ease-out load-bar-primary"
               style={{ width: `${primaryPct}%` }}
             />
             <div
-              className="h-full rounded-r-full bg-teal-400 transition-all duration-700 ease-out"
+              className="h-full rounded-r-full transition-all duration-700 ease-out load-bar-partner"
               style={{ width: `${partnerPct}%` }}
             />
           </div>
@@ -164,7 +235,7 @@ export default function LoadScoreBar() {
 
         {/* Imbalance nudge */}
         {imbalanced && (
-          <div className="px-4 py-2.5 bg-orange-50 border-t border-orange-100 flex items-start gap-2">
+          <div className="px-5 py-3 bg-orange-50 border-t border-orange-100/80 flex items-start gap-2.5">
             <span className="text-base leading-none mt-0.5">💬</span>
             <p className="text-xs text-orange-700 leading-relaxed">
               <span className="font-semibold">Worth a conversation?</span> One person is carrying
@@ -182,8 +253,7 @@ export default function LoadScoreBar() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Show the imbalance signal when one person carries more than this share of the total
-              load.
+              Show the imbalance signal when one person carries more than this share of the total load.
             </p>
             <div className="space-y-3">
               <div className="flex justify-between text-sm">

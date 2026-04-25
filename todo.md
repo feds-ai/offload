@@ -106,3 +106,12 @@
 
 ## Phase 17: Bug Fixes
 - [x] Fix voice input "failed to fetch audio file" error — replaced storagePut + URL fetch with direct buffer-to-Whisper transcription (transcribeBuffer.ts)
+
+## Phase 18: Visual Design Polish (decorative enhancements)
+- [x] Add subtle organic blob/gradient background to app shell and key pages
+- [x] Add decorative SVG/CSS accents to Onboarding (soft circles, wave dividers)
+- [x] Enhance LoadScoreBar with richer gradient and decorative ring/glow
+- [x] Add subtle card depth (layered shadows, micro-borders) to TaskCard
+- [x] Polish Dashboard header with decorative background pattern
+- [x] Improve Settings and SharedView page visual hierarchy and decoration
+- [x] Refine global typography scale and spacing tokens

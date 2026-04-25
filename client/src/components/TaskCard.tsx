@@ -60,7 +60,7 @@ interface TaskCardProps {
 const URGENCY_LEFT_BORDER: Record<string, string> = {
   high: "border-l-red-400",
   medium: "border-l-amber-400",
-  low: "border-l-transparent",
+  low: "border-l-primary/20",
 };
 
 const URGENCY_DOT: Record<string, string> = {
@@ -70,6 +70,12 @@ const URGENCY_DOT: Record<string, string> = {
 };
 
 const URGENCY_LABELS: Record<string, string> = { high: "Urgent", medium: "Soon", low: "Low" };
+
+const URGENCY_BG: Record<string, string> = {
+  high: "bg-red-50/60",
+  medium: "bg-amber-50/40",
+  low: "",
+};
 
 const CATEGORY_ICONS: Record<string, string> = {
   school: "🎒",
@@ -91,6 +97,15 @@ function formatDeadline(deadline: Date | null): string | null {
   if (isTomorrow(d)) return "Tomorrow";
   if (isPast(d)) return `Overdue · ${format(d, "d MMM")}`;
   return format(d, "d MMM");
+}
+
+function ownerInitials(name: string) {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 export default function TaskCard({ task, onRefresh }: TaskCardProps) {
@@ -209,21 +224,23 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
     <>
       <div
         className={`
-          group relative bg-card rounded-xl border-l-4 border border-border
-          transition-all duration-200
-          ${isDone ? "opacity-50" : "hover:shadow-sm hover:-translate-y-px"}
-          ${isOverdue && !isDone ? "border-orange-200 bg-orange-50/20" : ""}
+          group relative rounded-xl border-l-4 transition-all duration-200
+          ${isDone
+            ? "opacity-50 bg-card border border-border"
+            : `card-elevated hover:-translate-y-0.5 hover:shadow-[0_2px_16px_oklch(0_0_0/0.10),0_0_0_1px_oklch(0.88_0.018_175/0.5)] ${URGENCY_BG[task.urgency]}`
+          }
+          ${isOverdue && !isDone ? "border-orange-200 bg-orange-50/30" : ""}
           ${URGENCY_LEFT_BORDER[task.urgency]}
         `}
       >
-        <div className="flex items-start gap-3 px-4 py-3">
+        <div className="flex items-start gap-3 px-4 py-3.5">
           {/* Check button */}
           <button
             onClick={isDone ? markOpen : markDone}
-            className={`mt-0.5 shrink-0 transition-colors ${
+            className={`mt-0.5 shrink-0 transition-all ${
               isDone
                 ? "text-primary"
-                : "text-muted-foreground/40 hover:text-primary"
+                : "text-muted-foreground/30 hover:text-primary hover:scale-110"
             }`}
             aria-label={isDone ? "Mark as open" : "Mark as done"}
           >
@@ -243,7 +260,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
                   isDone ? "line-through text-muted-foreground" : "text-foreground"
                 }`}
               >
-                <span className="mr-1.5">{CATEGORY_ICONS[task.category] ?? "✅"}</span>
+                <span className="mr-1.5 text-base">{CATEGORY_ICONS[task.category] ?? "✅"}</span>
                 {task.title}
                 {task.lowConfidence && (
                   <span
@@ -254,7 +271,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
                   </span>
                 )}
                 {task.isRecurring && (
-                  <span className="ml-1.5 text-muted-foreground" title="Recurring">
+                  <span className="ml-1.5 text-muted-foreground/60" title="Recurring">
                     <RotateCcw className="w-3 h-3 inline" />
                   </span>
                 )}
@@ -263,11 +280,11 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
               {/* Actions menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="shrink-0 text-muted-foreground/40 hover:text-foreground p-0.5 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                  <button className="shrink-0 text-muted-foreground/30 hover:text-foreground p-0.5 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-muted/60">
                     <MoreHorizontal className="w-4 h-4" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" className="w-48 shadow-lg">
                   <DropdownMenuItem onClick={() => setEditOpen(true)}>
                     <Pencil className="w-4 h-4 mr-2" /> Edit
                   </DropdownMenuItem>
@@ -298,10 +315,10 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
             </div>
 
             {/* Meta row */}
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
               {/* Urgency dot + label */}
               {task.urgency !== "low" && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   <span className={`w-1.5 h-1.5 rounded-full ${URGENCY_DOT[task.urgency]}`} />
                   {URGENCY_LABELS[task.urgency]}
                 </span>
@@ -312,7 +329,7 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
                 <span
                   className={`text-xs flex items-center gap-1 ${
                     isOverdue && !isDone
-                      ? "text-orange-600 font-medium"
+                      ? "text-orange-600 font-semibold"
                       : "text-muted-foreground"
                   }`}
                 >
@@ -321,9 +338,12 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
                 </span>
               )}
 
-              {/* Owner chip */}
+              {/* Owner chip — pill with initials */}
               {ownerMember && (
-                <span className="ml-auto text-xs text-muted-foreground/70 font-medium">
+                <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground/80 bg-muted/50 px-2 py-0.5 rounded-full border border-border/40">
+                  <span className="w-3.5 h-3.5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[9px] font-bold leading-none">
+                    {ownerInitials(ownerMember.displayName)}
+                  </span>
                   {ownerMember.displayName}
                 </span>
               )}

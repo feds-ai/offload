@@ -56,7 +56,6 @@ export default function Dashboard() {
   const [identityOpen, setIdentityOpen] = useState(false);
   const [inputOpen, setInputOpen] = useState(false);
 
-  // Load household data from token
   const { data: householdData, isLoading: householdLoading } = trpc.household.getByToken.useQuery(
     { token: token ?? "" },
     { enabled: !!token }
@@ -67,7 +66,6 @@ export default function Dashboard() {
     { enabled: !!token && !!household }
   );
 
-  // Sync household data into context
   useEffect(() => {
     if (householdData) {
       setHousehold(householdData.household as any);
@@ -75,12 +73,10 @@ export default function Dashboard() {
     }
   }, [householdData]);
 
-  // Redirect to onboarding if no token
   useEffect(() => {
     if (!token) navigate("/onboarding");
   }, [token]);
 
-  // Show identity check if needed
   useEffect(() => {
     if (needsIdentityCheck) setIdentityOpen(true);
   }, [needsIdentityCheck]);
@@ -131,7 +127,9 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <Leaf className="w-8 h-8 text-primary animate-pulse" />
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Leaf className="w-6 h-6 text-primary animate-pulse" />
+          </div>
           <p className="text-sm text-muted-foreground">Loading your household...</p>
         </div>
       </div>
@@ -139,14 +137,26 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      {/* Top nav */}
-      <header className="sticky top-0 z-30 bg-card/95 backdrop-blur border-b border-border/60">
+    <div className="min-h-screen bg-background pb-28 relative overflow-x-hidden">
+      {/* ── Decorative background blobs ───────────────────────── */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          background: `
+            radial-gradient(ellipse 60% 40% at 0% 0%, oklch(0.88 0.07 165 / 0.4) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 35% at 100% 100%, oklch(0.86 0.08 185 / 0.3) 0%, transparent 55%),
+            radial-gradient(ellipse 40% 30% at 70% 30%, oklch(0.90 0.05 155 / 0.2) 0%, transparent 50%)
+          `,
+        }}
+      />
+
+      {/* ── Top nav ───────────────────────────────────────────── */}
+      <header className="sticky top-0 z-30 bg-card/80 backdrop-blur-md border-b border-border/50 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          {/* Brand + identity */}
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Leaf className="w-4 h-4 text-primary" />
+            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm">
+              <Leaf className="w-4 h-4 text-primary-foreground" />
             </div>
             <div className="flex flex-col leading-none">
               <span className="text-sm font-bold text-foreground tracking-tight">Offload</span>
@@ -155,13 +165,12 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-          {/* Actions */}
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShareOpen(true)}
-              className="text-muted-foreground h-8 px-2.5 text-xs gap-1.5"
+              className="text-muted-foreground h-8 px-2.5 text-xs gap-1.5 hover:bg-primary/8"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Share</span>
@@ -170,7 +179,7 @@ export default function Dashboard() {
               variant="ghost"
               size="sm"
               onClick={() => navigate("/settings")}
-              className="text-muted-foreground h-8 w-8 p-0"
+              className="text-muted-foreground h-8 w-8 p-0 hover:bg-primary/8"
             >
               <Settings className="w-4 h-4" />
             </Button>
@@ -178,33 +187,33 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-5 space-y-5">
-        {/* Load score — always visible at the top */}
+      <main className="relative z-10 max-w-2xl mx-auto px-4 py-5 space-y-5">
+        {/* Load score */}
         <LoadScoreBar />
 
         {/* View tabs */}
         <Tabs value={view} onValueChange={(v) => setView(v as TaskView)}>
-          <TabsList className="w-full">
-            <TabsTrigger value="household" className="flex-1">
+          <TabsList className="w-full bg-white/60 backdrop-blur-sm border border-border/50 shadow-sm">
+            <TabsTrigger value="household" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
               Household
               {openTasks.length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1">
+                <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1 bg-primary/10 text-primary border-0">
                   {openTasks.length}
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="mine" className="flex-1">
+            <TabsTrigger value="mine" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
               {myMember?.displayName ?? "Mine"}
               {openTasks.filter((t: Task) => t.ownerMemberId === myMemberId).length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1">
+                <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1 bg-primary/10 text-primary border-0">
                   {openTasks.filter((t: Task) => t.ownerMemberId === myMemberId).length}
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="partner" className="flex-1">
+            <TabsTrigger value="partner" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
               {partnerMember?.displayName ?? "Partner"}
               {openTasks.filter((t: Task) => t.ownerMemberId !== myMemberId).length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1">
+                <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1 bg-primary/10 text-primary border-0">
                   {openTasks.filter((t: Task) => t.ownerMemberId !== myMemberId).length}
                 </Badge>
               )}
@@ -213,10 +222,11 @@ export default function Dashboard() {
 
           <TabsContent value={view} className="mt-4 space-y-6">
             {visibleOpen.length > 0 && (
-              <section className="space-y-2">
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <section className="space-y-2.5">
+                <div className="section-label">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 inline-block" />
                   Open · {visibleOpen.length}
-                </h2>
+                </div>
                 <div className="space-y-2">
                   {visibleOpen.map((task: Task) => (
                     <TaskCard key={task.id} task={task} onRefresh={handleRefresh} />
@@ -226,10 +236,11 @@ export default function Dashboard() {
             )}
 
             {visibleSnoozed.length > 0 && (
-              <section className="space-y-2">
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <section className="space-y-2.5">
+                <div className="section-label">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400/70 inline-block" />
                   Snoozed · {visibleSnoozed.length}
-                </h2>
+                </div>
                 <div className="space-y-2">
                   {visibleSnoozed.map((task: Task) => (
                     <TaskCard key={task.id} task={task} onRefresh={handleRefresh} />
@@ -239,10 +250,11 @@ export default function Dashboard() {
             )}
 
             {visibleDone.length > 0 && (
-              <section className="space-y-2">
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <section className="space-y-2.5">
+                <div className="section-label">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/70 inline-block" />
                   Done · {visibleDone.length}
-                </h2>
+                </div>
                 <div className="space-y-2">
                   {visibleDone.map((task: Task) => (
                     <TaskCard key={task.id} task={task} onRefresh={handleRefresh} />
@@ -253,10 +265,10 @@ export default function Dashboard() {
 
             {visibleOpen.length === 0 && visibleSnoozed.length === 0 && visibleDone.length === 0 && (
               <div className="text-center py-16 space-y-3">
-                <div className="text-5xl">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white/70 shadow-sm border border-border/50 text-4xl backdrop-blur-sm">
                   {view === "mine" ? "🌱" : view === "partner" ? "✨" : "🌿"}
                 </div>
-                <p className="text-base font-medium text-foreground">
+                <p className="text-base font-semibold text-foreground">
                   {view === "mine"
                     ? "Nothing on your plate"
                     : view === "partner"
@@ -279,7 +291,7 @@ export default function Dashboard() {
       {/* ── Floating pill CTA ─────────────────────────────────── */}
       <button
         onClick={() => setInputOpen(true)}
-        className="fixed bottom-6 right-1/2 translate-x-1/2 sm:right-6 sm:translate-x-0 z-40 flex items-center gap-2 px-5 py-3.5 rounded-full bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 active:scale-95 transition-all text-sm font-semibold tracking-wide"
+        className="fab-pill fixed bottom-6 right-1/2 translate-x-1/2 sm:right-6 sm:translate-x-0 z-40 flex items-center gap-2 px-5 py-3.5 rounded-full text-primary-foreground active:scale-95 transition-all text-sm font-semibold tracking-wide"
         aria-label="Add task or event"
       >
         <Plus className="w-4 h-4" strokeWidth={2.5} />
@@ -289,83 +301,85 @@ export default function Dashboard() {
       {/* ── Input bottom sheet ────────────────────────────────── */}
       <Dialog open={inputOpen} onOpenChange={setInputOpen}>
         <DialogContent className="sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-t-2xl sm:rounded-2xl">
-          {/* Drag handle for mobile */}
           <div className="flex justify-center pt-3 pb-1 sm:hidden">
             <div className="w-10 h-1 rounded-full bg-border" />
           </div>
-          <div className="flex items-center justify-between px-5 pt-4 pb-2 border-b border-border/50">
-            <h2 className="font-semibold text-foreground">Add to Offload</h2>
-            <button
-              onClick={() => setInputOpen(false)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="px-4 py-4">
+          <DialogHeader className="px-5 pt-4 pb-2">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-base font-semibold">What's on your mind?</DialogTitle>
+              <button
+                onClick={() => setInputOpen(false)}
+                className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted/60 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </DialogHeader>
+          <div className="px-5 pb-6">
             <InputBar onTasksAdded={handleRefresh} />
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* ── Share dialog ─────────────────────────────────────── */}
+      {/* ── Share dialog ──────────────────────────────────────── */}
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Share with {partnerMember?.displayName ?? "your partner"}</DialogTitle>
+            <DialogTitle>Share with your partner</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Share this link with your partner. They'll be asked who they are when they open it.
-              Both of you have full access to view and manage tasks.
+              Send this link to your partner so they can access your shared household on their device.
             </p>
             {household && (
-              <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2.5">
-                <span className="flex-1 text-xs text-foreground font-mono truncate">
+              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-xl border border-border/60">
+                <code className="text-xs text-foreground flex-1 truncate">
                   {window.location.origin}/shared/{household.shareToken}
-                </span>
+                </code>
                 <button
                   onClick={copyShareLink}
-                  className="text-primary hover:text-primary/80 shrink-0"
+                  className="shrink-0 text-muted-foreground hover:text-primary transition-colors p-1"
                 >
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                 </button>
               </div>
             )}
+            <Button onClick={copyShareLink} className="w-full gap-2">
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? "Copied!" : "Copy link"}
+            </Button>
           </div>
-          <Button onClick={copyShareLink} className="w-full">
-            {copied ? "Copied!" : "Copy link"}
-          </Button>
         </DialogContent>
       </Dialog>
 
-      {/* Identity check dialog */}
+      {/* ── Identity check dialog ─────────────────────────────── */}
       <Dialog open={identityOpen} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+        <DialogContent className="max-w-sm" showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <User className="w-5 h-5 text-primary" />
-              Who are you?
-            </DialogTitle>
+            <DialogTitle>Who are you?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Pick your name so Offload knows whose view to show.
-          </p>
-          <div className="space-y-2 pt-2">
-            {members.map((m) => (
-              <Button
-                key={m.id}
-                variant="outline"
-                className="w-full justify-start gap-3"
-                onClick={() => {
-                  if (token) persistIdentity(token, m.id);
-                  setIdentityOpen(false);
-                }}
-              >
-                <span className="text-lg">{m.role === "primary" ? "🌿" : "🌱"}</span>
-                {m.displayName}
-              </Button>
-            ))}
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Select your name so Offload knows whose view to show you.
+            </p>
+            <div className="space-y-2">
+              {members.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    if (!token) return;
+                    persistIdentity(token, m.id);
+                    setIdentityOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-border/60 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all text-left group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold group-hover:bg-primary/20 transition-colors">
+                    {m.displayName.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="font-medium text-foreground">{m.displayName}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
