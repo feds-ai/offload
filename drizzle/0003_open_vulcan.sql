@@ -1,0 +1,1 @@
+ALTER TABLE `dismissed_inference_types` ADD `dismissCount` int DEFAULT 1 NOT NULL;

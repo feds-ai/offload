@@ -365,10 +365,9 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const household = await requireHousehold(input.token);
-        await dismissInferenceType(household.id, input.inferenceType, input.label);
-        return { success: true };
+        const dismissCount = await dismissInferenceType(household.id, input.inferenceType, input.label);
+        return { success: true, dismissCount };
       }),
-
     restore: publicProcedure
       .input(z.object({ token: z.string(), inferenceType: z.string() }))
       .mutation(async ({ input }) => {

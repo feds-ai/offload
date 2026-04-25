@@ -210,10 +210,43 @@ export async function getDismissedInferenceTypes(householdId: number) {
   return db.select().from(dismissedInferenceTypes).where(eq(dismissedInferenceTypes.householdId, householdId));
 }
 
-export async function dismissInferenceType(householdId: number, inferenceType: string, label: string) {
+/**
+ * Upsert a dismissed inference type, incrementing the count on each call.
+ * Returns the new dismissCount so callers can decide whether to show the toast.
+ */
+export async function dismissInferenceType(
+  householdId: number,
+  inferenceType: string,
+  label: string
+): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  await db.insert(dismissedInferenceTypes).values({ householdId, inferenceType, label });
+  const existing = await db
+    .select()
+    .from(dismissedInferenceTypes)
+    .where(
+      and(
+        eq(dismissedInferenceTypes.householdId, householdId),
+        eq(dismissedInferenceTypes.inferenceType, inferenceType)
+      )
+    )
+    .limit(1);
+  if (existing.length > 0) {
+    const newCount = existing[0].dismissCount + 1;
+    await db
+      .update(dismissedInferenceTypes)
+      .set({ dismissCount: newCount, label })
+      .where(
+        and(
+          eq(dismissedInferenceTypes.householdId, householdId),
+          eq(dismissedInferenceTypes.inferenceType, inferenceType)
+        )
+      );
+    return newCount;
+  } else {
+    await db.insert(dismissedInferenceTypes).values({ householdId, inferenceType, label, dismissCount: 1 });
+    return 1;
+  }
 }
 
 export async function restoreInferenceType(householdId: number, inferenceType: string) {

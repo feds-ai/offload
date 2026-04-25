@@ -196,24 +196,24 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
   async function handleDelete() {
     await deleteTask.mutateAsync({ taskId: task.id, token: token ?? "" });
     const inferenceKey = `${task.category}:${task.subject ?? "any"}`;
-    const alreadyDismissed = (dismissedTypes ?? []).some(
-      (d: any) => d.inferenceType === inferenceKey
-    );
-    if (!alreadyDismissed) {
-      try {
-        await dismissInference.mutateAsync({
-          token: token ?? "",
-          inferenceType: inferenceKey,
-          label: task.title,
-        });
+    // Only permanently silence a task type after 3 deletions of the same type.
+    // The dismiss mutation now returns the running count.
+    const DISMISS_THRESHOLD = 3;
+    try {
+      const result = await dismissInference.mutateAsync({
+        token: token ?? "",
+        inferenceType: inferenceKey,
+        label: task.title,
+      });
+      if (result.dismissCount >= DISMISS_THRESHOLD) {
         toast(
           `Got it — I won't suggest tasks like "${task.title}" again. Re-enable in Settings.`,
           { duration: 5000 }
         );
-      } catch {
+      } else {
         toast.success("Task removed");
       }
-    } else {
+    } catch {
       toast.success("Task removed");
     }
   }

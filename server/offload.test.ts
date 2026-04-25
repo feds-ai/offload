@@ -61,7 +61,7 @@ vi.mock("./db", async () => {
     createRoutingRule: vi.fn().mockResolvedValue(undefined),
     deleteRoutingRule: vi.fn().mockResolvedValue(undefined),
     getDismissedInferenceTypes: vi.fn().mockResolvedValue([]),
-    dismissInferenceType: vi.fn().mockResolvedValue(undefined),
+    dismissInferenceType: vi.fn().mockResolvedValue(1), // returns dismissCount; increment manually in tests that need higher counts
     restoreInferenceType: vi.fn().mockResolvedValue(undefined),
     updateHouseholdThreshold: vi.fn().mockResolvedValue(undefined),
     updateMemberCalendarToken: vi.fn().mockResolvedValue(undefined),
@@ -209,5 +209,29 @@ describe("routing", () => {
       assigneeMemberId: 2,
     });
     expect(result.success).toBe(true);
+  });
+
+  it("dismiss returns dismissCount=1 on first deletion", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.routing.dismiss({
+      token: TEST_TOKEN,
+      inferenceType: "social:kids",
+      label: "Buy birthday present",
+    });
+    expect(result.success).toBe(true);
+    expect(result.dismissCount).toBe(1);
+  });
+
+  it("dismiss returns dismissCount=3 after threshold is reached", async () => {
+    // Simulate the mock returning 3 (third deletion of same type)
+    const { dismissInferenceType } = await import("./db");
+    vi.mocked(dismissInferenceType).mockResolvedValueOnce(3);
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.routing.dismiss({
+      token: TEST_TOKEN,
+      inferenceType: "social:kids",
+      label: "Buy birthday present",
+    });
+    expect(result.dismissCount).toBe(3);
   });
 });

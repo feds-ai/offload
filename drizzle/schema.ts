@@ -87,6 +87,7 @@ export const dismissedInferenceTypes = mysqlTable("dismissed_inference_types", {
   householdId: int("householdId").notNull(),
   inferenceType: varchar("inferenceType", { length: 128 }).notNull(), // e.g. "arrange_travel"
   label: varchar("label", { length: 255 }).notNull(), // human-readable
+  dismissCount: int("dismissCount").notNull().default(1), // incremented on each deletion; silenced at 3
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

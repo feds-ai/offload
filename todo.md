@@ -115,3 +115,6 @@
 - [x] Polish Dashboard header with decorative background pattern
 - [x] Improve Settings and SharedView page visual hierarchy and decoration
 - [x] Refine global typography scale and spacing tokens
+
+## Phase 19: Bug Fixes
+- [x] Fix dismissal learning: "won't suggest again" toast should only fire after 3+ deletions of the same task type, not on first deletion
