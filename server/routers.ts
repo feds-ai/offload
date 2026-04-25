@@ -22,6 +22,7 @@ import {
   getTasksByMember,
   getHouseholdRhythm,
   restoreInferenceType,
+  updateEventGoogleIds,
   updateHouseholdThreshold,
   updateMemberCalendarToken,
   updateTask,
@@ -38,6 +39,7 @@ import {
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
+import { createCalendarEvent, exchangeCodeForTokens, isCalendarConfigured } from "./calendar";
 
 // ─── Token-based auth helpers ─────────────────────────────────────────────────
 
@@ -472,6 +474,24 @@ export const appRouter = router({
           isRecurring: input.isRecurring,
           lowConfidence: input.lowConfidence,
         });
+        // Push task as all-day calendar reminder to assigned carer if they have a token and there's a deadline
+        if (input.deadline && isCalendarConfigured()) {
+          try {
+            const members = await getMembersByHousehold(household.id);
+            const owner = members.find((m) => m.id === input.ownerMemberId);
+            if (owner?.googleCalendarToken) {
+              const gcalId = await createCalendarEvent(owner.googleCalendarToken, {
+                title: `☑️ ${input.title}`,
+                description: input.description,
+                allDay: true,
+                date: new Date(input.deadline),
+              });
+              if (gcalId) await updateTask(task.id, { googleEventId: gcalId });
+            }
+          } catch (e) {
+            console.warn("[Calendar] Task push failed (non-fatal):", e);
+          }
+        }
         return task;
       }),
 
@@ -550,6 +570,36 @@ export const appRouter = router({
           endTime: input.endTime ? new Date(input.endTime) : undefined,
           subjectName: input.subjectName,
         });
+        // Push event to both carers' calendars if they have tokens
+        if (isCalendarConfigured()) {
+          try {
+            const members = await getMembersByHousehold(household.id);
+            const updates: Partial<{ googleEventIdPrimary: string; googleEventIdPartner: string }> = {};
+            const primary = members.find((m) => m.role === "primary");
+            const partner = members.find((m) => m.role === "partner");
+            const calEvent = {
+              title: input.title,
+              description: input.description,
+              allDay: !input.startTime,
+              date: input.startTime ? undefined : new Date(),
+              startDateTime: input.startTime ? new Date(input.startTime) : null,
+              endDateTime: input.endTime ? new Date(input.endTime) : null,
+            };
+            if (primary?.googleCalendarToken) {
+              const id = await createCalendarEvent(primary.googleCalendarToken, calEvent);
+              if (id) updates.googleEventIdPrimary = id;
+            }
+            if (partner?.googleCalendarToken) {
+              const id = await createCalendarEvent(partner.googleCalendarToken, calEvent);
+              if (id) updates.googleEventIdPartner = id;
+            }
+            if (Object.keys(updates).length > 0) {
+              await updateEventGoogleIds(event.id, updates.googleEventIdPrimary, updates.googleEventIdPartner);
+            }
+          } catch (e) {
+            console.warn("[Calendar] Event push failed (non-fatal):", e);
+          }
+        }
         return event;
       }),
   }),

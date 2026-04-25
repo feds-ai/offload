@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useHousehold } from "@/contexts/HouseholdContext";
@@ -127,6 +127,22 @@ export default function Settings() {
       partnerName: partnerMember?.displayName ?? "Partner",
     });
   }
+
+  // ─── Google Calendar OAuth redirect handling ────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("calendarConnected") === "true") {
+      toast.success("Google Calendar connected!", {
+        description: "Events and task reminders will now be added to your calendar automatically.",
+      });
+      window.history.replaceState({}, "", "/settings");
+    } else if (params.get("calendarError")) {
+      toast.error("Google Calendar connection failed", {
+        description: "Please try again. If the problem persists, check your credentials in Settings → Secrets.",
+      });
+      window.history.replaceState({}, "", "/settings");
+    }
+  }, []);
 
   // ─── Google Calendar ────────────────────────────────────────────────────────
   const { data: calendarAuthData } = trpc.calendar.getAuthUrl.useQuery(

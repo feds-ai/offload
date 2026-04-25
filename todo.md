@@ -58,10 +58,10 @@
 - [x] Task deletion with dismissal learning
 
 ## Phase 9: Google Calendar Integration
-- [ ] Google OAuth flow for both carers
-- [ ] Push events to both carers' calendars
-- [ ] Push tasks with deadlines as all-day reminders to assigned carer only
-- [ ] Store Google Calendar token per user (encrypted)
+- [x] Google OAuth flow for both carers
+- [x] Push events to both carers' calendars
+- [x] Push tasks with deadlines as all-day reminders to assigned carer only
+- [x] Store Google Calendar token per member (as JSON in DB)
 
 ## Phase 10: Settings
 - [x] Imbalance threshold configuration (default 60/40, configurable via LoadScoreBar)
