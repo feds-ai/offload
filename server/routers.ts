@@ -39,6 +39,7 @@ import {
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
+import { transcribeBuffer } from "./transcribeBuffer";
 import { createCalendarEvent, exchangeCodeForTokens, isCalendarConfigured } from "./calendar";
 
 // ─── Token-based auth helpers ─────────────────────────────────────────────────
@@ -243,7 +244,7 @@ export const appRouter = router({
         return result;
       }),
 
-    fromVoice: publicProcedure
+      fromVoice: publicProcedure
       .input(
         z.object({
           token: z.string(),
@@ -253,14 +254,9 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const household = await requireHousehold(input.token);
-
         const buffer = Buffer.from(input.audioBase64, "base64");
-        const ext = input.mimeType.split("/")[1] ?? "webm";
-        const tempKey = `temp/voice-${nanoid(16)}.${ext}`;
-        const { url } = await storagePut(tempKey, buffer, input.mimeType);
-
-        const transcript = await transcribeVoiceNote(url);
-
+        // Send buffer directly to Whisper — avoids the storage URL fetch issue
+        const transcript = await transcribeBuffer(buffer, input.mimeType);
         const dismissed = await getDismissedInferenceTypes(household.id);
         const dismissedTypes = dismissed.map((d) => d.inferenceType);
         const result = await extractFromText(transcript, dismissedTypes);

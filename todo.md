@@ -98,8 +98,11 @@
 - [x] Quick-add shorthand text field accessible directly from the FAB tap
 
 ## Phase 16: Visual Design Polish
-- [ ] Replace plain circular FAB with a labelled pill CTA button (e.g. "+ Offload it")
-- [ ] Improve LoadScoreBar visual design with richer layout
-- [ ] Improve TaskCard visual design with better hierarchy and colour accents
-- [ ] Improve Dashboard header with subtle branding
-- [ ] Improve overall colour use and spacing for a more crafted feel
+- [x] Replace plain circular FAB with a labelled pill CTA button (e.g. "+ Offload it")
+- [x] Improve LoadScoreBar visual design with richer layout
+- [x] Improve TaskCard visual design with better hierarchy and colour accents
+- [x] Improve Dashboard header with subtle branding
+- [x] Improve overall colour use and spacing for a more crafted feel
+
+## Phase 17: Bug Fixes
+- [x] Fix voice input "failed to fetch audio file" error — replaced storagePut + URL fetch with direct buffer-to-Whisper transcription (transcribeBuffer.ts)
