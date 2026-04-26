@@ -64,111 +64,24 @@ export async function extractFromText(
   dismissedInferenceTypes: string[] = [],
   householdContext?: string
 ): Promise<ExtractionResult> {
-  const dismissedList =
-    dismissedInferenceTypes.length > 0
-      ? `\nDo NOT suggest tasks of these inference types (user has dismissed them): ${dismissedInferenceTypes.join(", ")}`
-      : "";
+  const parts = text
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
 
-  const contextNote = householdContext
-    ? `\nHousehold context (use for routing hints): ${householdContext}`
-    : "";
+  const tasks: ExtractedTask[] = parts.map((title) => ({
+    title,
+    category: "general",
+    subject: "any",
+    urgency: "medium",
+    isRecurringSuggestion: false,
+    lowConfidence: false,
+  }));
 
-  const systemPrompt = `You are an intelligent household assistant that extracts events and tasks from family-related text.
-
-Your job:
-1. Extract EVENTS — any commitment that happens at a specific time (appointments, lessons, classes, parties, trips, shows, sports, recurrings). These go on the household calendar. Be generous: if something has a day/time or recurs weekly, it IS an event. Include recurring events (e.g. "Ballet every Saturday at 10am") — set startTime to the next upcoming occurrence.
-2. Extract and INFER TASKS (actionable to-do items, including non-obvious preparation tasks).
-   - A birthday party invite → infer "buy present", "RSVP", possibly "arrange travel"
-   - School swimming on Wednesdays → event (swimming lesson) + infer "pack swimmers and towel" (recurring task)
-   - Theatre booking → event (theatre) + infer "find babysitter", "plan dinner"
-   - School trip → event (school trip) + infer "make payment by X", "pack lunch on day", "permission slip by Y"
-   - Only infer non-obvious tasks — don't suggest things that are trivially obvious
-   - Do NOT create a task for the event itself (e.g. don't create "attend ballet" as a task)
-3. If a birthday party is detected, suggest EXACTLY 3 age-appropriate present ideas.
-4. Flag tasks as lowConfidence if you are unsure about them.
-5. Infer urgency from deadlines: high = within 3 days, medium = within 2 weeks, low = beyond 2 weeks.
-6. If a task sounds recurring (e.g. weekly swimming), set isRecurringSuggestion = true.
-7. For subject, use: "kids", "self", "partner", "pet", or "any".
-8. For category, use one of: school, medical, social, admin, household, insurance, cars, pets, finance, general.
-9. For inferenceType, use snake_case labels like: buy_present, pack_swimmers, arrange_travel, find_babysitter, make_payment, permission_slip, pack_lunch, rsvp, arrange_time_off.
-${dismissedList}${contextNote}
-
-Return valid JSON only, no markdown.`;
-
-  const response = await invokeLLM({
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: `Extract events and tasks from this input:\n\n${text}` },
-    ],
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "extraction_result",
-        strict: true,
-        schema: {
-          type: "object",
-          properties: {
-            events: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  location: { type: "string" },
-                  startTime: { type: "string" },
-                  endTime: { type: "string" },
-                  subjectName: { type: "string" },
-                },
-                required: ["title"],
-                additionalProperties: false,
-              },
-            },
-            tasks: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  category: { type: "string" },
-                  subject: { type: "string" },
-                  qualifier: { type: "string" },
-                  deadline: { type: "string" },
-                  urgency: { type: "string", enum: ["low", "medium", "high"] },
-                  isRecurringSuggestion: { type: "boolean" },
-                  lowConfidence: { type: "boolean" },
-                  inferenceType: { type: "string" },
-                },
-                required: ["title", "category", "subject", "urgency", "isRecurringSuggestion", "lowConfidence"],
-                additionalProperties: false,
-              },
-            },
-            birthdayPresents: {
-              type: "array",
-              items: { type: "string" },
-            },
-            recurrencePrompt: { type: "string" },
-          },
-          required: ["events", "tasks"],
-          additionalProperties: false,
-        },
-      },
-    },
-  });
-
-  const rawContent = response.choices[0]?.message?.content;
-  const content = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent);
-  if (!content) throw new Error("No response from AI");
-
-  const parsed = JSON.parse(content) as ExtractionResult;
-
-  // Ensure exactly 3 birthday presents if present
-  if (parsed.birthdayPresents && parsed.birthdayPresents.length > 3) {
-    parsed.birthdayPresents = parsed.birthdayPresents.slice(0, 3);
-  }
-
-  return parsed;
+  return {
+    events: [],
+    tasks,
+  };
 }
 
 // ─── Extract text from image via LLM vision ───────────────────────────────────

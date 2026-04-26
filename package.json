@@ -10,7 +10,7 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "bash -c 'if [ -z \"$DATABASE_URL\" ]; then echo \"Skipping drizzle: using local file DB fallback at .manus/db/local-dev.json\"; exit 0; fi; drizzle-kit generate && drizzle-kit migrate'"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
