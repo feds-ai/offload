@@ -2,6 +2,10 @@
  * Google Calendar integration helper.
  * Uses the Google Calendar REST API directly (no SDK needed).
  * Tokens are stored as JSON in householdMembers.googleCalendarToken.
+ *
+ * Key design: when an access token is refreshed, the caller receives the new
+ * token JSON back so it can persist it to the DB. This prevents the "refresh
+ * and discard" bug where every request refreshes but never saves the new token.
  */
 import { ENV } from "./_core/env";
 
@@ -30,11 +34,19 @@ async function refreshAccessToken(refreshToken: string): Promise<TokenData | nul
     }),
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "(unreadable)");
+    console.error("[Calendar] refreshAccessToken failed:", res.status, errText);
+    return null;
+  }
   const data = await res.json() as any;
+  if (!data.access_token) {
+    console.error("[Calendar] refreshAccessToken: no access_token in response", JSON.stringify(data));
+    return null;
+  }
   return {
     access_token: data.access_token,
-    refresh_token: refreshToken,
+    refresh_token: refreshToken, // Google does not always return a new refresh_token
     expiry_date: Date.now() + (data.expires_in ?? 3600) * 1000,
   };
 }
@@ -81,42 +93,57 @@ export async function exchangeCodeForTokens(
 
 /**
  * Get a valid access token, refreshing if needed.
+ * Returns { accessToken, newTokenJson } where newTokenJson is non-null if a
+ * refresh happened — the caller MUST persist it back to the DB.
  */
-async function getValidAccessToken(tokenJson: string): Promise<string | null> {
+async function getValidAccessToken(tokenJson: string): Promise<{
+  accessToken: string | null;
+  newTokenJson: string | null;
+}> {
   let tokenData: TokenData;
   try {
     tokenData = JSON.parse(tokenJson) as TokenData;
   } catch {
-    return null;
+    console.error("[Calendar] getValidAccessToken: invalid token JSON");
+    return { accessToken: null, newTokenJson: null };
   }
 
   // Refresh if expired or expiring within 5 minutes
   if (tokenData.expiry_date < Date.now() + 5 * 60 * 1000) {
+    console.log("[Calendar] Access token expired, refreshing...");
     const refreshed = await refreshAccessToken(tokenData.refresh_token);
-    if (!refreshed) return null;
-    tokenData = refreshed;
+    if (!refreshed) {
+      console.error("[Calendar] Token refresh failed — member will need to reconnect Google Calendar");
+      return { accessToken: null, newTokenJson: null };
+    }
+    console.log("[Calendar] Token refreshed successfully, new expiry:", new Date(refreshed.expiry_date).toISOString());
+    return {
+      accessToken: refreshed.access_token,
+      newTokenJson: JSON.stringify(refreshed),
+    };
   }
 
-  return tokenData.access_token;
+  return { accessToken: tokenData.access_token, newTokenJson: null };
 }
 
 /**
  * Create a Google Calendar event for a given member.
- * Returns the Google Calendar event ID or null on failure.
+ * Returns { googleEventId, newTokenJson } where newTokenJson is non-null if the
+ * token was refreshed and must be persisted back to the DB by the caller.
  */
 export async function createCalendarEvent(
   tokenJson: string,
   event: {
     title: string;
     description?: string;
-    startDateTime?: Date | null; // if null, creates an all-day event on today
+    startDateTime?: Date | null;
     endDateTime?: Date | null;
     allDay?: boolean;
-    date?: Date | null; // for all-day events
+    date?: Date | null;
   }
-): Promise<string | null> {
-  const accessToken = await getValidAccessToken(tokenJson);
-  if (!accessToken) return null;
+): Promise<{ googleEventId: string | null; newTokenJson: string | null }> {
+  const { accessToken, newTokenJson } = await getValidAccessToken(tokenJson);
+  if (!accessToken) return { googleEventId: null, newTokenJson: null };
 
   let eventBody: Record<string, unknown>;
 
@@ -145,6 +172,8 @@ export async function createCalendarEvent(
     };
   }
 
+  console.log("[Calendar] Creating event:", event.title, "allDay:", !!(event.allDay || !event.startDateTime));
+
   const res = await fetch(
     "https://www.googleapis.com/calendar/v3/calendars/primary/events",
     {
@@ -158,12 +187,15 @@ export async function createCalendarEvent(
   );
 
   if (!res.ok) {
-    console.error("[Calendar] Failed to create event:", await res.text());
-    return null;
+    const errText = await res.text().catch(() => "(unreadable)");
+    console.error("[Calendar] Failed to create event:", res.status, errText);
+    return { googleEventId: null, newTokenJson };
   }
 
   const data = await res.json() as any;
-  return data.id as string ?? null;
+  const googleEventId = (data.id as string) ?? null;
+  console.log("[Calendar] Event created successfully, id:", googleEventId);
+  return { googleEventId, newTokenJson };
 }
 
 /**
@@ -173,8 +205,14 @@ export async function deleteCalendarEvent(
   tokenJson: string,
   googleEventId: string
 ): Promise<boolean> {
-  const accessToken = await getValidAccessToken(tokenJson);
+  const { accessToken, newTokenJson } = await getValidAccessToken(tokenJson);
   if (!accessToken) return false;
+
+  // If token was refreshed, we can't easily persist it here without memberId.
+  // Log it so it's not silently lost.
+  if (newTokenJson) {
+    console.log("[Calendar] deleteCalendarEvent: token was refreshed but cannot persist without memberId — caller should handle");
+  }
 
   const res = await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}`,

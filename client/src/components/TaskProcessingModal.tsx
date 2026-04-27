@@ -219,7 +219,7 @@ export default function TaskProcessingModal({
         // Find matching event
         const matchingEvent = savedEvents[0]; // simplistic — link first event
 
-        await createTask.mutateAsync({
+        const created = await createTask.mutateAsync({
           token,
           eventId: matchingEvent?.id,
           title: task.title,
@@ -234,6 +234,12 @@ export default function TaskProcessingModal({
           isRecurring,
           lowConfidence: task.lowConfidence,
         });
+        if (task.deadline && created.calendarPushed) {
+          const ownerName = members.find((m) => m.id === ownerId)?.displayName ?? "them";
+          toast.success(`📅 Added to ${ownerName}'s Google Calendar`);
+        } else if (task.deadline && created.calendarError) {
+          toast.error(`Calendar sync failed: ${created.calendarError}`);
+        }
       }
 
       // Learn routing rules from confirmed owner assignments

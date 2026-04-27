@@ -327,25 +327,26 @@ export default function TaskCard({ task, onRefresh, onReassign }: TaskCardProps)
 
             {/* Meta row */}
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {/* Urgency dot + label */}
-              {task.urgency !== "low" && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <span className={`w-1.5 h-1.5 rounded-full ${URGENCY_DOT[task.urgency]}`} />
-                  {URGENCY_LABELS[task.urgency]}
-                </span>
-              )}
-
-              {/* Deadline */}
-              {deadlineStr && (
+              {/* Urgency dot + label + deadline combined */}
+              {(task.urgency !== "low" || deadlineStr) && (
                 <span
-                  className={`text-xs flex items-center gap-1 ${
-                    isOverdue && !isDone
-                      ? "text-orange-600 font-semibold"
-                      : "text-muted-foreground"
+                  className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                    isOverdue && !isDone ? "text-orange-600" : "text-muted-foreground"
                   }`}
                 >
-                  <Calendar className="w-3 h-3" />
-                  {deadlineStr}
+                  {task.urgency !== "low" && (
+                    <>
+                      <span className={`w-1.5 h-1.5 rounded-full ${URGENCY_DOT[task.urgency]}`} />
+                      {URGENCY_LABELS[task.urgency]}
+                    </>
+                  )}
+                  {deadlineStr && (
+                    <>
+                      {task.urgency !== "low" && <span className="text-muted-foreground/50">·</span>}
+                      <Calendar className="w-3 h-3" />
+                      <span className={isOverdue && !isDone ? "font-semibold" : ""}>{deadlineStr}</span>
+                    </>
+                  )}
                 </span>
               )}
 

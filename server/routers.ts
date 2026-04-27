@@ -31,7 +31,7 @@ import {
   updateEventGoogleIds,
   updateHouseholdThreshold,
   updateMemberAvatar,
-  updateMemberCalendarToken,
+  updateMemberCalendarToken as updateMemberToken,
   updateTask,
   upsertHouseholdRhythm,
 } from "./db";
@@ -500,24 +500,33 @@ export const appRouter = router({
           lowConfidence: input.lowConfidence,
         });
         // Push task as all-day calendar reminder to assigned carer if they have a token and there's a deadline
+        let calendarPushed = false;
+        let calendarError: string | null = null;
         if (input.deadline && isCalendarConfigured()) {
           try {
             const members = await getMembersByHousehold(household.id);
             const owner = members.find((m) => m.id === input.ownerMemberId);
             if (owner?.googleCalendarToken) {
-              const gcalId = await createCalendarEvent(owner.googleCalendarToken, {
+              const { googleEventId: gcalId, newTokenJson } = await createCalendarEvent(owner.googleCalendarToken, {
                 title: `☑️ ${input.title}`,
                 description: input.description,
                 allDay: true,
                 date: new Date(input.deadline),
               });
-              if (gcalId) await updateTask(task.id, { googleEventId: gcalId });
+              if (newTokenJson) await updateMemberToken(owner.id, newTokenJson);
+              if (gcalId) {
+                await updateTask(task.id, { googleEventId: gcalId });
+                calendarPushed = true;
+              } else {
+                calendarError = "Calendar event creation returned no ID";
+              }
             }
           } catch (e) {
+            calendarError = String(e);
             console.warn("[Calendar] Task push failed (non-fatal):", e);
           }
         }
-        return task;
+        return { ...task, calendarPushed, calendarError };
       }),
 
     update: publicProcedure
@@ -566,12 +575,13 @@ export const appRouter = router({
             if (effectiveDeadline) {
               const newOwner = members.find((m) => m.id === input.ownerMemberId);
               if (newOwner?.googleCalendarToken) {
-                const gcalId = await createCalendarEvent(newOwner.googleCalendarToken, {
+                const { googleEventId: gcalId, newTokenJson } = await createCalendarEvent(newOwner.googleCalendarToken, {
                   title: `☑️ ${input.title ?? existingTask.title}`,
                   description: input.description ?? existingTask.description ?? undefined,
                   allDay: true,
                   date: effectiveDeadline,
                 });
+                if (newTokenJson) await updateMemberToken(newOwner.id, newTokenJson);
                 if (gcalId) await updateTask(taskId, { googleEventId: gcalId });
               }
             }
@@ -644,11 +654,13 @@ export const appRouter = router({
               endDateTime: input.endTime ? new Date(input.endTime) : null,
             };
             if (primary?.googleCalendarToken) {
-              const id = await createCalendarEvent(primary.googleCalendarToken, calEvent);
+              const { googleEventId: id, newTokenJson } = await createCalendarEvent(primary.googleCalendarToken, calEvent);
+              if (newTokenJson) await updateMemberToken(primary.id, newTokenJson);
               if (id) updates.googleEventIdPrimary = id;
             }
             if (partner?.googleCalendarToken) {
-              const id = await createCalendarEvent(partner.googleCalendarToken, calEvent);
+              const { googleEventId: id, newTokenJson } = await createCalendarEvent(partner.googleCalendarToken, calEvent);
+              if (newTokenJson) await updateMemberToken(partner.id, newTokenJson);
               if (id) updates.googleEventIdPartner = id;
             }
             if (Object.keys(updates).length > 0) {
@@ -954,7 +966,7 @@ Do NOT include one-off tasks. Keep titles short (max 6 words). Category should b
       .input(z.object({ token: z.string(), memberId: z.number(), calendarToken: z.string() }))
       .mutation(async ({ input }) => {
         await requireMember(input.token, input.memberId);
-        await updateMemberCalendarToken(input.memberId, input.calendarToken);
+        await updateMemberToken(input.memberId, input.calendarToken);
         return { success: true };
       }),
 

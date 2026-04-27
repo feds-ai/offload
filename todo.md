@@ -206,3 +206,11 @@
 ## Phase 34: Bug fixes
 - [x] Input is being classified as events instead of tasks — clarified: events are time-bound items (Taekwondo on Wednesday), tasks are action items (pack bag). Modal already separates them; AI classification is correct.
 - [x] Calendar push not firing — root cause: state param was double-encoded (encodeURIComponent on already-encoded JSON) causing invalid_state on callback; also Settings queried getAuthUrl with memberId=0 before members loaded, hiding the whole calendar section. Both fixed.
+
+## Phase 35: Bug fixes
+- [x] Task deadline shows "Soon" without the actual date — show date alongside urgency label
+- [x] Google Calendar push still not sending events to Gmail — root cause: refreshed access token was never persisted back to DB (refresh-and-discard bug). Fixed: createCalendarEvent now returns newTokenJson when refresh happened; all callers persist it via updateMemberToken.
+
+## Phase 35 follow-up
+- [x] Add calendar sync failure toast so user knows when push fails (not silent)
+- [x] Show calendar sync success toast after task creation with deadline
