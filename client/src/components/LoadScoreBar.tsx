@@ -279,20 +279,25 @@ export default function LoadScoreBar() {
 
   const primaryCount = primary?.openCount ?? 0;
   const partnerCount = partner?.openCount ?? 0;
-  const maxCount = Math.max(primaryCount, partnerCount, 1);
+  // Full load = tasks + responsibilities (the "general" load)
+  const primaryScore = primary?.score ?? primaryCount;
+  const partnerScore = partner?.score ?? partnerCount;
+  const primaryResponsibilities = (primary as any)?.responsibilityCount ?? 0;
+  const partnerResponsibilities = (partner as any)?.responsibilityCount ?? 0;
+  const maxScore = Math.max(primaryScore, partnerScore, 1);
 
-  // Ring fill: proportional to task count vs the heavier person (0–1)
-  const primaryFill = primaryCount / maxCount;
-  const partnerFill = partnerCount / maxCount;
+  // Ring fill: proportional to FULL score (tasks + responsibilities) vs the heavier person (0–1)
+  const primaryFill = primaryScore / maxScore;
+  const partnerFill = partnerScore / maxScore;
 
-  // Crate count: 1–4 based on task count
-  const primaryCrates = Math.min(4, Math.max(1, Math.ceil(primaryCount / 2)));
-  const partnerCrates = Math.min(4, Math.max(1, Math.ceil(partnerCount / 2)));
+  // Crate count: 1–4 based on full score
+  const primaryCrates = Math.min(4, Math.max(1, Math.ceil(primaryScore / 2)));
+  const partnerCrates = Math.min(4, Math.max(1, Math.ceil(partnerScore / 2)));
 
-  const primaryIsHeavier = primaryCount >= partnerCount;
+  const primaryIsHeavier = primaryScore >= partnerScore;
 
   // Boat tilt: negative = tilt left (primary heavier), positive = tilt right (partner heavier)
-  const tiltMagnitude = maxCount > 0 ? Math.abs(primaryCount - partnerCount) / maxCount : 0;
+  const tiltMagnitude = maxScore > 0 ? Math.abs(primaryScore - partnerScore) / maxScore : 0;
   const boatTilt = imbalanced ? (primaryIsHeavier ? -tiltMagnitude : tiltMagnitude) : 0;
 
   // Colours: teal when balanced/lighter, warm amber when heavier + imbalanced
@@ -306,8 +311,8 @@ export default function LoadScoreBar() {
     primary?.member.displayName ?? "Person 1",
     partner?.member.displayName ?? "Person 2",
     primaryIsHeavier,
-    primaryCount,
-    partnerCount
+    primaryScore,
+    partnerScore
   );
 
   async function saveThreshold() {
@@ -389,6 +394,9 @@ export default function LoadScoreBar() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {primaryCount} {primaryCount === 1 ? "task" : "tasks"}
+                  {primaryResponsibilities > 0 && (
+                    <span className="ml-1 opacity-60">+ {primaryResponsibilities} ongoing</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -423,6 +431,9 @@ export default function LoadScoreBar() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {partnerCount} {partnerCount === 1 ? "task" : "tasks"}
+                  {partnerResponsibilities > 0 && (
+                    <span className="ml-1 opacity-60">+ {partnerResponsibilities} ongoing</span>
+                  )}
                 </p>
               </div>
             </div>

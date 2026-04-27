@@ -195,3 +195,7 @@
 - [x] Add "Responsibilities" concept: permanent/recurring mental load items that always weigh on an owner (not completable tasks). New DB table: responsibilities. Shown on Dashboard in a separate collapsible section per person. Counted in load score.
 - [x] Auto-generate responsibilities from household rhythm when rhythm is saved (AI extracts recurring activities per person as responsibilities).
 - [x] Allow manual add/remove of responsibilities from Dashboard or Settings.
+
+## Phase 32: QA fixes
+- [x] Responsibilities should count toward BOTH members' load (they are shared household burdens), not just the owner's score
+- [x] Fix: offloading a task to partner does not create a Google Calendar event for the new owner

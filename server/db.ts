@@ -363,7 +363,7 @@ export async function updateTask(
     urgency: "low" | "medium" | "high";
     urgencyOverridden: boolean;
     isRecurring: boolean;
-    googleEventId: string;
+    googleEventId: string | null;
   }>
 ) {
   const db = await getDb();

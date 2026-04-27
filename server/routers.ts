@@ -23,6 +23,7 @@ import {
   getMembersByHousehold,
   getResponsibilitiesByHousehold,
   getRoutingRules,
+  getTaskById,
   getTasksByHousehold,
   getTasksByMember,
   getHouseholdRhythm,
@@ -47,7 +48,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
 import { transcribeBuffer } from "./transcribeBuffer";
-import { createCalendarEvent, exchangeCodeForTokens, isCalendarConfigured } from "./calendar";
+import { createCalendarEvent, deleteCalendarEvent, exchangeCodeForTokens, isCalendarConfigured } from "./calendar";
 
 // ─── Token-based auth helpers ─────────────────────────────────────────────────
 
@@ -539,13 +540,46 @@ export const appRouter = router({
         const { token, taskId, deadline, ...rest } = input;
         // Verify task belongs to this household
         const allTasks = await getTasksByHousehold(household.id);
-        if (!allTasks.find((t) => t.id === taskId)) {
+        const existingTask = allTasks.find((t) => t.id === taskId);
+        if (!existingTask) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
         await updateTask(taskId, {
           ...rest,
           ...(deadline !== undefined ? { deadline: deadline ? new Date(deadline) : null } : {}),
         });
+
+        // Push a calendar event to the new owner when ownership changes (offload)
+        if (input.ownerMemberId && input.ownerMemberId !== existingTask.ownerMemberId && isCalendarConfigured()) {
+          try {
+            const members = await getMembersByHousehold(household.id);
+            // Delete the old owner's calendar event if one exists
+            const oldOwner = members.find((m) => m.id === existingTask.ownerMemberId);
+            if (oldOwner?.googleCalendarToken && existingTask.googleEventId) {
+              await deleteCalendarEvent(oldOwner.googleCalendarToken, existingTask.googleEventId).catch(() => {});
+              await updateTask(taskId, { googleEventId: null });
+            }
+            // Create a new event for the new owner — only if there is a deadline
+            const effectiveDeadline = deadline !== undefined
+              ? (deadline ? new Date(deadline) : null)
+              : existingTask.deadline;
+            if (effectiveDeadline) {
+              const newOwner = members.find((m) => m.id === input.ownerMemberId);
+              if (newOwner?.googleCalendarToken) {
+                const gcalId = await createCalendarEvent(newOwner.googleCalendarToken, {
+                  title: `☑️ ${input.title ?? existingTask.title}`,
+                  description: input.description ?? existingTask.description ?? undefined,
+                  allDay: true,
+                  date: effectiveDeadline,
+                });
+                if (gcalId) await updateTask(taskId, { googleEventId: gcalId });
+              }
+            }
+          } catch (e) {
+            console.warn("[Calendar] Offload calendar push failed (non-fatal):", e);
+          }
+        }
+
         return { success: true };
       }),
 
