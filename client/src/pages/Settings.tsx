@@ -180,7 +180,7 @@ export default function Settings() {
 
   // ─── Google Calendar ────────────────────────────────────────────────────────
   const { data: calendarAuthData } = trpc.calendar.getAuthUrl.useQuery(
-    { token: token ?? "", redirectUri: `${window.location.origin}/calendar-callback` },
+    { token: token ?? "", redirectUri: `${window.location.origin}/api/calendar/callback` },
     { enabled: !!token }
   );
 
