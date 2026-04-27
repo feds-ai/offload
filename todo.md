@@ -164,3 +164,17 @@
 - [x] LoadScoreBar: replace plant-themed status messages with boat-themed equivalents
 - [x] Empty state: replace plant illustration with calm water boat SVG, change "All clear!" to "Calm waters!"
 - [x] App icon: update to incorporate subtle boat/wave motif
+
+## Phase 28: Google Calendar Integration
+- [ ] Remove built-in Calendar tab and HouseholdCalendar component from Dashboard
+- [ ] Set up Google Calendar OAuth flow (auth URL generation, callback handler, token storage per member)
+- [ ] Add "Connect Google Calendar" button in Settings for each member
+- [ ] Sync offloaded events to connected member's Google Calendar on creation
+- [ ] Show connected/disconnected status in Settings
+
+## Phase 28 Status
+- [x] Remove built-in Calendar tab and HouseholdCalendar component from Dashboard
+- [x] Google Calendar OAuth backend (calendar.ts, calendarOAuth.ts) already built
+- [x] Settings page already has Connect Google Calendar UI per member
+- [x] Events sync to Google Calendar on creation via createCalendarEvent helper
+- [x] GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET added via secrets — active on publish

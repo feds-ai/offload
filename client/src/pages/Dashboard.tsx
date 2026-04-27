@@ -8,8 +8,7 @@ import LoadScoreBar from "@/components/LoadScoreBar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Share2, Settings, Copy, Check, User, Plus, X, CalendarDays } from "lucide-react";
-import HouseholdCalendar from "@/components/HouseholdCalendar";
+import { Share2, Settings, Copy, Check, User, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -18,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-type TaskView = "household" | "mine" | "partner" | "calendar";
+type TaskView = "household" | "mine" | "partner";
 
 interface Task {
   id: number;
@@ -52,7 +51,6 @@ export default function Dashboard() {
     myMember,
   } = useHousehold();
   const [view, setView] = useState<TaskView>("household");
-  const isCalendarView = view === "calendar";
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
@@ -237,16 +235,7 @@ export default function Dashboard() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="calendar" className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              <CalendarDays className="w-3.5 h-3.5" />
-            </TabsTrigger>
           </TabsList>
-
-          {isCalendarView && (
-            <TabsContent value="calendar" className="mt-4">
-              <HouseholdCalendar />
-            </TabsContent>
-          )}
 
           <TabsContent value={view} className="mt-4 space-y-6">
             {visibleOpen.length > 0 && (
