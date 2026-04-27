@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ChevronRight, ChevronLeft, Leaf } from "lucide-react";
+import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useHousehold } from "@/contexts/HouseholdContext";
 
 const CATEGORIES = [
@@ -170,8 +170,14 @@ export default function Onboarding() {
       {/* ── Header ──────────────────────────────────────────── */}
       <header className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-border/50 bg-card/70 backdrop-blur-sm">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm">
-            <Leaf className="w-4 h-4 text-primary-foreground" />
+          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm overflow-hidden">
+            <svg viewBox="0 0 32 32" width="20" height="20" aria-hidden>
+              <path d="M2 22 Q8 19 16 22 Q24 25 30 22 L30 28 L2 28 Z" fill="white" opacity={0.35} />
+              <path d="M7 22 Q10 27 16 28 Q22 27 25 22 Z" fill="white" opacity={0.85} />
+              <rect x="8" y="18" width="16" height="5" rx="1.5" fill="white" opacity={0.7} />
+              <line x1="16" y1="18" x2="16" y2="8" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity={0.9} />
+              <path d="M16 8 L23 11 L16 14 Z" fill="white" opacity={0.9} />
+            </svg>
           </div>
           <span className="font-bold text-foreground text-base tracking-tight">Offload</span>
         </div>
