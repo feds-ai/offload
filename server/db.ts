@@ -1,5 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import fs from "node:fs";
+import path from "node:path";
 import {
   dismissedInferenceTypes,
   events,
@@ -15,6 +17,57 @@ import {
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+const LOCAL_DB_PATH = path.resolve(process.cwd(), ".manus/db/local-dev.json");
+
+type LocalState = {
+  counters: Record<string, number>;
+  households: any[];
+  householdMembers: any[];
+  householdRhythm: any[];
+  routingRules: any[];
+  dismissedInferenceTypes: any[];
+  tasks: any[];
+  events: any[];
+  users: any[];
+};
+
+let _localState: LocalState | null = null;
+
+function isLocalDevDbMode() {
+  return !process.env.DATABASE_URL;
+}
+
+function getLocalState(): LocalState {
+  if (_localState) return _localState;
+  try {
+    const raw = fs.readFileSync(LOCAL_DB_PATH, "utf8");
+    _localState = JSON.parse(raw) as LocalState;
+  } catch {
+    _localState = {
+      counters: {},
+      households: [],
+      householdMembers: [],
+      householdRhythm: [],
+      routingRules: [],
+      dismissedInferenceTypes: [],
+      tasks: [],
+      events: [],
+      users: [],
+    };
+  }
+  return _localState!;
+}
+
+function saveLocalState() {
+  if (!_localState) return;
+  fs.mkdirSync(path.dirname(LOCAL_DB_PATH), { recursive: true });
+  fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(_localState, null, 2));
+}
+
+function nextId(state: LocalState, key: string) {
+  state.counters[key] = (state.counters[key] ?? 0) + 1;
+  return state.counters[key];
+}
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -76,6 +129,20 @@ export async function getUserByOpenId(openId: string) {
 
 export async function createHousehold(name: string, shareToken: string) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    const row = {
+      id: nextId(s, "households"),
+      name,
+      shareToken,
+      imbalanceThreshold: 0.6,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    s.households.push(row);
+    saveLocalState();
+    return row as any;
+  }
   if (!db) throw new Error("DB unavailable");
   await db.insert(households).values({ name, shareToken });
   const result = await db.select().from(households).where(eq(households.shareToken, shareToken)).limit(1);
@@ -84,6 +151,9 @@ export async function createHousehold(name: string, shareToken: string) {
 
 export async function getHouseholdByToken(shareToken: string) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState().households.find((h) => h.shareToken === shareToken);
+  }
   if (!db) return undefined;
   const result = await db.select().from(households).where(eq(households.shareToken, shareToken)).limit(1);
   return result[0];
@@ -91,6 +161,9 @@ export async function getHouseholdByToken(shareToken: string) {
 
 export async function getHouseholdById(id: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState().households.find((h) => h.id === id);
+  }
   if (!db) return undefined;
   const result = await db.select().from(households).where(eq(households.id, id)).limit(1);
   return result[0];
@@ -98,6 +171,15 @@ export async function getHouseholdById(id: number) {
 
 export async function updateHouseholdThreshold(householdId: number, threshold: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    const row = s.households.find((h) => h.id === householdId);
+    if (!row) throw new Error("Household not found");
+    row.imbalanceThreshold = threshold;
+    row.updatedAt = new Date();
+    saveLocalState();
+    return;
+  }
   if (!db) throw new Error("DB unavailable");
   await db.update(households).set({ imbalanceThreshold: threshold }).where(eq(households.id, householdId));
 }
@@ -111,6 +193,21 @@ export async function createHouseholdMember(
   role: "primary" | "partner"
 ) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    const row = {
+      id: nextId(s, "householdMembers"),
+      householdId,
+      userId: userId ?? null,
+      displayName,
+      role,
+      googleCalendarToken: null,
+      createdAt: new Date(),
+    };
+    s.householdMembers.push(row);
+    saveLocalState();
+    return row as any;
+  }
   if (!db) throw new Error("DB unavailable");
   await db.insert(householdMembers).values({ householdId, userId: userId ?? undefined, displayName, role });
   const result = await db
@@ -124,6 +221,9 @@ export async function createHouseholdMember(
 
 export async function getMembersByHousehold(householdId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState().householdMembers.filter((m) => m.householdId === householdId);
+  }
   if (!db) return [];
   return db.select().from(householdMembers).where(eq(householdMembers.householdId, householdId));
 }
@@ -142,6 +242,9 @@ export async function getMemberByUserId(userId: number | null, householdId: numb
 
 export async function getMemberById(memberId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState().householdMembers.find((m) => m.id === memberId);
+  }
   if (!db) return undefined;
   const result = await db.select().from(householdMembers).where(eq(householdMembers.id, memberId)).limit(1);
   return result[0];
@@ -155,6 +258,14 @@ export async function updateMemberCalendarToken(memberId: number, token: string 
 
 export async function updateMemberAvatar(memberId: number, avatarUrl: string | null) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    const member = s.householdMembers.find((m) => m.id === memberId);
+    if (!member) throw new Error("Member not found");
+    member.avatarUrl = avatarUrl;
+    saveLocalState();
+    return;
+  }
   if (!db) throw new Error("DB unavailable");
   await db.update(householdMembers).set({ avatarUrl }).where(eq(householdMembers.id, memberId));
 }
@@ -167,6 +278,26 @@ export async function upsertHouseholdRhythm(
   structuredData: unknown
 ) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    const existing = s.householdRhythm.find((r) => r.householdId === householdId);
+    if (existing) {
+      existing.rawText = rawText;
+      existing.structuredData = structuredData;
+      existing.updatedAt = new Date();
+    } else {
+      s.householdRhythm.push({
+        id: nextId(s, "householdRhythm"),
+        householdId,
+        rawText,
+        structuredData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+    saveLocalState();
+    return;
+  }
   if (!db) throw new Error("DB unavailable");
   await db
     .insert(householdRhythm)
@@ -176,6 +307,9 @@ export async function upsertHouseholdRhythm(
 
 export async function getHouseholdRhythm(householdId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState().householdRhythm.find((r) => r.householdId === householdId);
+  }
   if (!db) return undefined;
   const result = await db.select().from(householdRhythm).where(eq(householdRhythm.householdId, householdId)).limit(1);
   return result[0];
@@ -185,6 +319,9 @@ export async function getHouseholdRhythm(householdId: number) {
 
 export async function getRoutingRules(householdId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState().routingRules.filter((r) => r.householdId === householdId);
+  }
   if (!db) return [];
   return db.select().from(routingRules).where(eq(routingRules.householdId, householdId));
 }
@@ -198,12 +335,33 @@ export async function createRoutingRule(
   source: "onboarding" | "learned" | "manual" = "onboarding"
 ) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    s.routingRules.push({
+      id: nextId(s, "routingRules"),
+      householdId,
+      category,
+      subject,
+      qualifier,
+      assigneeMemberId,
+      source,
+      createdAt: new Date(),
+    });
+    saveLocalState();
+    return;
+  }
   if (!db) throw new Error("DB unavailable");
   await db.insert(routingRules).values({ householdId, category, subject, qualifier, assigneeMemberId, source });
 }
 
 export async function deleteRoutingRule(ruleId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    s.routingRules = s.routingRules.filter((r) => r.id !== ruleId);
+    saveLocalState();
+    return;
+  }
   if (!db) throw new Error("DB unavailable");
   await db.delete(routingRules).where(eq(routingRules.id, ruleId));
 }
@@ -212,6 +370,9 @@ export async function deleteRoutingRule(ruleId: number) {
 
 export async function getDismissedInferenceTypes(householdId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState().dismissedInferenceTypes.filter((d) => d.householdId === householdId);
+  }
   if (!db) return [];
   return db.select().from(dismissedInferenceTypes).where(eq(dismissedInferenceTypes.householdId, householdId));
 }
@@ -226,6 +387,28 @@ export async function dismissInferenceType(
   label: string
 ): Promise<number> {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    const existing = s.dismissedInferenceTypes.find(
+      (d) => d.householdId === householdId && d.inferenceType === inferenceType
+    );
+    if (existing) {
+      existing.dismissCount += 1;
+      existing.label = label;
+      saveLocalState();
+      return existing.dismissCount;
+    }
+    s.dismissedInferenceTypes.push({
+      id: nextId(s, "dismissedInferenceTypes"),
+      householdId,
+      inferenceType,
+      label,
+      dismissCount: 1,
+      createdAt: new Date(),
+    });
+    saveLocalState();
+    return 1;
+  }
   if (!db) throw new Error("DB unavailable");
   const existing = await db
     .select()
@@ -257,6 +440,14 @@ export async function dismissInferenceType(
 
 export async function restoreInferenceType(householdId: number, inferenceType: string) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    s.dismissedInferenceTypes = s.dismissedInferenceTypes.filter(
+      (d) => !(d.householdId === householdId && d.inferenceType === inferenceType)
+    );
+    saveLocalState();
+    return;
+  }
   if (!db) throw new Error("DB unavailable");
   await db
     .delete(dismissedInferenceTypes)
@@ -282,6 +473,19 @@ export async function createEvent(
   }
 ) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    const row = {
+      id: nextId(s, "events"),
+      householdId,
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    s.events.push(row);
+    saveLocalState();
+    return row as any;
+  }
   if (!db) throw new Error("DB unavailable");
   await db.insert(events).values({ householdId, ...data });
   const result = await db
@@ -295,6 +499,11 @@ export async function createEvent(
 
 export async function getEventsByHousehold(householdId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState()
+      .events.filter((e) => e.householdId === householdId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
   if (!db) return [];
   return db.select().from(events).where(eq(events.householdId, householdId)).orderBy(desc(events.createdAt));
 }
@@ -316,6 +525,26 @@ export async function updateEventGoogleIds(
 
 export async function createTask(data: InsertTask) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    const row = {
+      id: nextId(s, "tasks"),
+      eventId: null,
+      status: "open",
+      deadline: null,
+      urgency: "medium",
+      urgencyOverridden: false,
+      isRecurringSuggestion: false,
+      isRecurring: false,
+      lowConfidence: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...data,
+    };
+    s.tasks.push(row);
+    saveLocalState();
+    return row as any;
+  }
   if (!db) throw new Error("DB unavailable");
   await db.insert(tasks).values(data);
   const result = await db
@@ -329,6 +558,11 @@ export async function createTask(data: InsertTask) {
 
 export async function getTasksByHousehold(householdId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState()
+      .tasks.filter((t) => t.householdId === householdId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
   if (!db) return [];
   return db
     .select()
@@ -339,6 +573,11 @@ export async function getTasksByHousehold(householdId: number) {
 
 export async function getTasksByMember(householdId: number, memberId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState()
+      .tasks.filter((t) => t.householdId === householdId && t.ownerMemberId === memberId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
   if (!db) return [];
   return db
     .select()
@@ -365,6 +604,14 @@ export async function updateTask(
   }>
 ) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    const task = s.tasks.find((t) => t.id === taskId);
+    if (!task) throw new Error("Task not found");
+    Object.assign(task, data, { updatedAt: new Date() });
+    saveLocalState();
+    return;
+  }
   if (!db) throw new Error("DB unavailable");
   await db.update(tasks).set(data).where(eq(tasks.id, taskId));
 }
@@ -377,12 +624,21 @@ export async function deleteEvent(eventId: number) {
 
 export async function deleteTask(taskId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    const s = getLocalState();
+    s.tasks = s.tasks.filter((t) => t.id !== taskId);
+    saveLocalState();
+    return;
+  }
   if (!db) throw new Error("DB unavailable");
   await db.delete(tasks).where(eq(tasks.id, taskId));
 }
 
 export async function getTaskById(taskId: number) {
   const db = await getDb();
+  if (!db && isLocalDevDbMode()) {
+    return getLocalState().tasks.find((t) => t.id === taskId);
+  }
   if (!db) return undefined;
   const result = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
   return result[0];
