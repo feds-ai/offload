@@ -8,7 +8,7 @@ import LoadScoreBar from "@/components/LoadScoreBar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Leaf, Share2, Settings, Copy, Check, User, Plus, X, CalendarDays } from "lucide-react";
+import { Share2, Settings, Copy, Check, User, Plus, X, CalendarDays } from "lucide-react";
 import HouseholdCalendar from "@/components/HouseholdCalendar";
 import { toast } from "sonner";
 import {
@@ -130,7 +130,12 @@ export default function Dashboard() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Leaf className="w-6 h-6 text-primary animate-pulse" />
+            <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden className="animate-pulse">
+              <path d="M7 22 Q10 27 16 28 Q22 27 25 22 Z" fill="oklch(0.48 0.12 185)" opacity={0.85} />
+              <rect x="8" y="18" width="16" height="5" rx="1.5" fill="oklch(0.48 0.12 185)" opacity={0.7} />
+              <line x1="16" y1="18" x2="16" y2="8" stroke="oklch(0.48 0.12 185)" strokeWidth="1.5" strokeLinecap="round" opacity={0.9} />
+              <path d="M16 8 L23 11 L16 14 Z" fill="oklch(0.48 0.12 185)" opacity={0.9} />
+            </svg>
           </div>
           <p className="text-sm text-muted-foreground">Loading your household...</p>
         </div>
@@ -157,8 +162,20 @@ export default function Dashboard() {
       <header className="sticky top-0 z-30 bg-card/80 backdrop-blur-md border-b border-border/50 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm">
-              <Leaf className="w-4 h-4 text-primary-foreground" />
+            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm overflow-hidden">
+              {/* Boat icon */}
+              <svg viewBox="0 0 32 32" width="20" height="20" aria-hidden>
+                {/* Water */}
+                <path d="M2 22 Q8 19 16 22 Q24 25 30 22 L30 28 L2 28 Z" fill="white" opacity={0.35} />
+                {/* Hull */}
+                <path d="M7 22 Q10 27 16 28 Q22 27 25 22 Z" fill="white" opacity={0.85} />
+                {/* Deck */}
+                <rect x="8" y="18" width="16" height="5" rx="1.5" fill="white" opacity={0.7} />
+                {/* Mast */}
+                <line x1="16" y1="18" x2="16" y2="8" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity={0.9} />
+                {/* Flag */}
+                <path d="M16 8 L23 11 L16 14 Z" fill="white" opacity={0.9} />
+              </svg>
             </div>
             <div className="flex flex-col leading-none">
               <span className="text-sm font-bold text-foreground tracking-tight">Offload</span>
@@ -275,16 +292,36 @@ export default function Dashboard() {
             )}
 
             {visibleOpen.length === 0 && visibleSnoozed.length === 0 && visibleDone.length === 0 && (
-              <div className="text-center py-16 space-y-3">
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white/70 shadow-sm border border-border/50 text-4xl backdrop-blur-sm">
-                  {view === "mine" ? "🌱" : view === "partner" ? "✨" : "🌿"}
+              <div className="text-center py-14 space-y-4">
+                {/* Calm water boat illustration */}
+                <div className="flex justify-center">
+                  <svg viewBox="0 0 160 100" width="160" height="100" aria-hidden>
+                    {/* Calm water */}
+                    <path d="M0 72 Q40 66 80 72 Q120 78 160 72 L160 100 L0 100 Z" fill="oklch(0.62 0.10 195)" opacity={0.3} />
+                    <path d="M0 78 Q40 74 80 78 Q120 82 160 78 L160 100 L0 100 Z" fill="oklch(0.62 0.10 195)" opacity={0.18} />
+                    {/* Hull */}
+                    <path d="M42 72 Q50 84 80 86 Q110 84 118 72 Z" fill="oklch(0.55 0.09 40)" opacity={0.85} />
+                    {/* Deck */}
+                    <rect x="44" y="65" width="72" height="8" rx="2.5" fill="oklch(0.65 0.09 45)" opacity={0.9} />
+                    {/* Cabin */}
+                    <rect x="60" y="52" width="40" height="14" rx="3" fill="white" opacity={0.85} />
+                    {/* Cabin windows */}
+                    <rect x="66" y="56" width="10" height="7" rx="2" fill="oklch(0.62 0.10 195)" opacity={0.55} />
+                    <rect x="80" y="56" width="10" height="7" rx="2" fill="oklch(0.62 0.10 195)" opacity={0.55} />
+                    {/* Mast */}
+                    <line x1="80" y1="52" x2="80" y2="26" stroke="oklch(0.45 0.07 40)" strokeWidth="2.5" strokeLinecap="round" />
+                    {/* Flag */}
+                    <path d="M80 26 L100 32 L80 38 Z" fill="oklch(0.55 0.14 20)" opacity={0.85} />
+                    {/* Bunting */}
+                    <path d="M80 26 Q95 30 110 26" fill="none" stroke="oklch(0.55 0.14 20)" strokeWidth="1" opacity={0.5} strokeDasharray="3 3" />
+                  </svg>
                 </div>
                 <p className="text-base font-semibold text-foreground">
                   {view === "mine"
-                    ? "Nothing on your plate"
+                    ? "Your deck is clear ⛵"
                     : view === "partner"
-                    ? `${partnerMember?.displayName ?? "Partner"} is all clear`
-                    : "All clear!"}
+                    ? `${partnerMember?.displayName ?? "Partner"} is sailing smoothly`
+                    : "Calm waters!"}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {view === "household"

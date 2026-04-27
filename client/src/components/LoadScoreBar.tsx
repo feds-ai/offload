@@ -13,92 +13,161 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 
-// ─── Plant SVG ────────────────────────────────────────────────────────────────
-// "load" is 0–1 where 0 = no tasks (perky) and 1 = heavy load (wilting)
-function PlantSVG({ load, color }: { load: number; color: string }) {
-  // Stem leans right when wilting (positive angle = right lean)
-  const wilt = load; // 0 = upright, 1 = fully wilted
-  const stemAngle = wilt * 28; // degrees of lean
-  const leafDroop = wilt * 18; // leaf angle droop
-  const opacity = 0.55 + (1 - wilt) * 0.45; // brighter when perky
-  const stemH = 20 - wilt * 5; // shorter stem when wilted
-
-  // Stem path: starts at bottom-center, curves to top with lean
+// ─── Cargo Crate SVG ──────────────────────────────────────────────────────────
+// crateCount is 1–4 representing how many crates are stacked
+function CrateSVG({ crateCount, color }: { crateCount: number; color: string }) {
+  const count = Math.max(1, Math.min(4, crateCount));
+  const crateH = 10;
+  const crateW = 18;
   const cx = 24;
-  const stemBottom = 44;
-  const stemTop = stemBottom - stemH;
-  const tipX = cx + Math.sin((stemAngle * Math.PI) / 180) * stemH;
-  const tipY = stemTop;
-
-  // Control point for gentle curve
-  const cpX = cx + Math.sin((stemAngle * Math.PI) / 180) * (stemH * 0.5);
-  const cpY = stemBottom - stemH * 0.6;
-
-  // Leaf positions — two leaves branching off the stem
-  const leftLeafAngle = -40 - leafDroop;
-  const rightLeafAngle = 40 + leafDroop;
+  const baseY = 44;
+  const opacity = 0.45 + (count / 4) * 0.5;
 
   return (
     <svg
       viewBox="0 0 48 48"
-      width="40"
-      height="40"
-      style={{ opacity, transition: "all 0.8s ease-out" }}
+      width="38"
+      height="38"
+      style={{ opacity, transition: "all 0.7s ease-out" }}
       aria-hidden
     >
-      {/* Pot */}
-      <path
-        d="M18 44 h12 l-1.5 4 h-9 z"
-        fill={color}
-        opacity={0.25}
-      />
-      <rect x="16" y="42" width="16" height="3" rx="1.5" fill={color} opacity={0.35} />
+      {Array.from({ length: count }).map((_, idx) => {
+        const y = baseY - idx * (crateH + 1);
+        const x = cx - crateW / 2;
+        return (
+          <g key={idx} style={{ transition: "all 0.7s ease-out" }}>
+            {/* Crate body */}
+            <rect
+              x={x}
+              y={y - crateH}
+              width={crateW}
+              height={crateH}
+              rx="2"
+              fill={color}
+              opacity={0.75 - idx * 0.05}
+            />
+            {/* Crate slat lines */}
+            <line
+              x1={cx}
+              y1={y - crateH}
+              x2={cx}
+              y2={y}
+              stroke="white"
+              strokeWidth="1"
+              opacity={0.4}
+            />
+            <line
+              x1={x}
+              y1={y - crateH / 2}
+              x2={x + crateW}
+              y2={y - crateH / 2}
+              stroke="white"
+              strokeWidth="0.8"
+              opacity={0.3}
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
 
-      {/* Stem */}
-      <path
-        d={`M ${cx} ${stemBottom} Q ${cpX} ${cpY} ${tipX} ${tipY}`}
-        fill="none"
-        stroke={color}
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        style={{ transition: "all 0.8s ease-out" }}
-      />
+// ─── Tilting Boat SVG ─────────────────────────────────────────────────────────
+// tilt: -1 = tilts left (primary heavier), +1 = tilts right (partner heavier), 0 = level
+// imbalanced: whether to show choppy water
+function BoatSVG({ tilt, imbalanced }: { tilt: number; imbalanced: boolean }) {
+  // tilt is -1 to +1; convert to degrees (max ±18 deg)
+  const angleDeg = tilt * 18;
+  const angleRad = (angleDeg * Math.PI) / 180;
 
-      {/* Left leaf */}
-      <g
-        transform={`translate(${cpX - 1} ${cpY + 4}) rotate(${leftLeafAngle})`}
-        style={{ transition: "all 0.8s ease-out" }}
-      >
-        <ellipse cx="0" cy="-7" rx="5" ry="8" fill={color} opacity={0.85} />
-        <line x1="0" y1="0" x2="0" y2="-13" stroke={color} strokeWidth="1" opacity={0.5} />
-      </g>
+  // Water wave animation class
+  const waterColor = imbalanced ? "oklch(0.55 0.12 210)" : "oklch(0.62 0.10 195)";
+  const waterOpacity = imbalanced ? 0.55 : 0.35;
 
-      {/* Right leaf */}
-      <g
-        transform={`translate(${cpX + 1} ${cpY + 4}) rotate(${rightLeafAngle})`}
-        style={{ transition: "all 0.8s ease-out" }}
-      >
-        <ellipse cx="0" cy="-7" rx="5" ry="8" fill={color} opacity={0.85} />
-        <line x1="0" y1="0" x2="0" y2="-13" stroke={color} strokeWidth="1" opacity={0.5} />
-      </g>
-
-      {/* Top bud / flower when perky */}
-      {wilt < 0.4 && (
-        <circle
-          cx={tipX}
-          cy={tipY - 3}
-          r={3.5}
-          fill={color}
-          opacity={0.9 - wilt}
-          style={{ transition: "all 0.8s ease-out" }}
-        />
+  return (
+    <svg
+      viewBox="0 0 120 80"
+      width="120"
+      height="80"
+      aria-hidden
+      style={{ overflow: "visible" }}
+    >
+      {/* Water surface */}
+      {imbalanced ? (
+        // Choppy water — multiple small waves
+        <>
+          <path
+            d="M0 58 Q10 53 20 58 Q30 63 40 58 Q50 53 60 58 Q70 63 80 58 Q90 53 100 58 Q110 63 120 58 L120 80 L0 80 Z"
+            fill={waterColor}
+            opacity={waterOpacity}
+          />
+          <path
+            d="M0 62 Q15 57 30 62 Q45 67 60 62 Q75 57 90 62 Q105 67 120 62 L120 80 L0 80 Z"
+            fill={waterColor}
+            opacity={waterOpacity * 0.6}
+          />
+        </>
+      ) : (
+        // Calm water — gentle single wave
+        <>
+          <path
+            d="M0 60 Q30 55 60 60 Q90 65 120 60 L120 80 L0 80 Z"
+            fill={waterColor}
+            opacity={waterOpacity}
+          />
+          <path
+            d="M0 65 Q30 61 60 65 Q90 69 120 65 L120 80 L0 80 Z"
+            fill={waterColor}
+            opacity={waterOpacity * 0.5}
+          />
+        </>
       )}
+
+      {/* Boat group — rotates around the waterline centre */}
+      <g
+        transform={`translate(60, 58) rotate(${angleDeg}) translate(-60, -58)`}
+        style={{ transition: "transform 1s ease-out" }}
+      >
+        {/* Hull */}
+        <path
+          d="M30 58 Q35 68 60 70 Q85 68 90 58 Z"
+          fill="oklch(0.55 0.09 40)"
+          opacity={0.9}
+        />
+        {/* Hull highlight */}
+        <path
+          d="M35 58 Q40 65 60 67 Q80 65 85 58 Z"
+          fill="white"
+          opacity={0.15}
+        />
+        {/* Deck */}
+        <rect x="32" y="52" width="56" height="7" rx="2" fill="oklch(0.65 0.09 45)" opacity={0.95} />
+        {/* Cabin */}
+        <rect x="46" y="42" width="28" height="11" rx="3" fill="white" opacity={0.85} />
+        {/* Cabin window */}
+        <rect x="52" y="45" width="7" height="5" rx="1.5" fill="oklch(0.62 0.10 195)" opacity={0.6} />
+        <rect x="62" y="45" width="7" height="5" rx="1.5" fill="oklch(0.62 0.10 195)" opacity={0.6} />
+        {/* Mast */}
+        <line x1="60" y1="42" x2="60" y2="20" stroke="oklch(0.45 0.07 40)" strokeWidth="2" strokeLinecap="round" />
+        {/* Flag / bunting */}
+        <path
+          d="M60 20 L75 25 L60 30 Z"
+          fill="oklch(0.55 0.14 20)"
+          opacity={0.85}
+        />
+        {/* Cargo crates on deck (more when imbalanced) */}
+        {imbalanced && (
+          <>
+            <rect x="34" y="46" width="8" height="7" rx="1" fill="oklch(0.55 0.09 40)" opacity={0.6} />
+            <rect x="78" y="46" width="8" height="7" rx="1" fill="oklch(0.55 0.09 40)" opacity={0.6} />
+          </>
+        )}
+      </g>
     </svg>
   );
 }
 
 // ─── Growth Ring SVG ──────────────────────────────────────────────────────────
-// fill is 0–1 representing how full the ring is
 function GrowthRing({
   fill,
   color,
@@ -112,7 +181,7 @@ function GrowthRing({
 }) {
   const r = (size - 8) / 2;
   const circ = 2 * Math.PI * r;
-  const dash = Math.max(0.04, fill) * circ; // always show at least a tiny arc
+  const dash = Math.max(0.04, fill) * circ;
 
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
@@ -124,17 +193,7 @@ function GrowthRing({
         style={{ transform: "rotate(-90deg)" }}
         aria-hidden
       >
-        {/* Track */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={4}
-          className="text-black/6"
-        />
-        {/* Fill arc */}
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={4} className="text-black/6" />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -147,7 +206,6 @@ function GrowthRing({
           style={{ transition: "stroke-dasharray 0.9s ease-out, stroke 0.6s ease-out" }}
         />
       </svg>
-      {/* Inner content */}
       <div className="relative flex items-center justify-center w-full h-full">
         {children}
       </div>
@@ -155,39 +213,44 @@ function GrowthRing({
   );
 }
 
-// ─── Warm sentences ───────────────────────────────────────────────────────────
+// ─── Boat-themed status sentences ─────────────────────────────────────────────
 function getBalanceSentence(
   imbalanced: boolean,
   primaryName: string,
   partnerName: string,
-  primaryIsHeavier: boolean
+  primaryIsHeavier: boolean,
+  primaryCount: number,
+  partnerCount: number
 ): { icon: string; text: string } {
   const heavierName = primaryIsHeavier ? primaryName : partnerName;
   const lighterName = primaryIsHeavier ? partnerName : primaryName;
+  const total = primaryCount + partnerCount;
+  const diff = Math.abs(primaryCount - partnerCount);
+
+  if (total === 0) {
+    return { icon: "⛵", text: `Smooth sailing — ${primaryName} and ${partnerName} are all clear.` };
+  }
 
   if (!imbalanced) {
     const balanced = [
-      { icon: "🌿", text: `${primaryName} and ${partnerName} are sharing the load well right now.` },
-      { icon: "💚", text: `Things feel balanced between ${primaryName} and ${partnerName} — lovely.` },
-      { icon: "🤝", text: `${primaryName} and ${partnerName} are in a good rhythm together.` },
-      { icon: "✨", text: `Equal footing — ${primaryName} and ${partnerName} are doing great.` },
+      { icon: "⛵", text: `Smooth sailing. ${primaryName} and ${partnerName} are doing great.` },
+      { icon: "🌊", text: `${primaryName} and ${partnerName} are keeping the boat level — nice work.` },
+      { icon: "⚓", text: `Steady as she goes. ${primaryName} and ${partnerName} are in good shape.` },
+      { icon: "🧭", text: `${primaryName} and ${partnerName} are navigating this together beautifully.` },
     ];
     const idx = (primaryName.charCodeAt(0) + partnerName.charCodeAt(0)) % balanced.length;
     return balanced[idx];
   }
 
-  const unbalanced = [
-    { icon: "💬", text: `${heavierName} is carrying a lot right now — worth a chat with ${lighterName}?` },
-    { icon: "🌱", text: `${heavierName} could use some relief. A good moment to redistribute a few things.` },
-    { icon: "🤲", text: `${lighterName}, ${heavierName} has a heavier plate at the moment — could you take something on?` },
-    { icon: "💛", text: `Noticing ${heavierName} has more on right now. Small shifts make a big difference.` },
-  ];
-  const idx = heavierName.charCodeAt(0) % unbalanced.length;
-  return unbalanced[idx];
+  // Imbalanced — check severity
+  if (diff >= 5) {
+    return { icon: "🚨", text: `Risk of capsizing — time to rebalance. ${lighterName}, could you take something on?` };
+  }
+
+  return { icon: "⛵", text: `The boat's leaning a little. Could ${lighterName} take something on from ${heavierName}?` };
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-
 export default function LoadScoreBar() {
   const { household, token } = useHousehold();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -210,7 +273,7 @@ export default function LoadScoreBar() {
 
   if (!loadData || !household) return null;
 
-  const { scores, totalScore, imbalanced } = loadData;
+  const { scores, imbalanced } = loadData;
   const primary = scores[0];
   const partner = scores[1];
 
@@ -222,11 +285,15 @@ export default function LoadScoreBar() {
   const primaryFill = primaryCount / maxCount;
   const partnerFill = partnerCount / maxCount;
 
-  // Plant load: 0 = no tasks (perky), 1 = max tasks (wilting)
-  const primaryLoad = primaryFill;
-  const partnerLoad = partnerFill;
+  // Crate count: 1–4 based on task count
+  const primaryCrates = Math.min(4, Math.max(1, Math.ceil(primaryCount / 2)));
+  const partnerCrates = Math.min(4, Math.max(1, Math.ceil(partnerCount / 2)));
 
   const primaryIsHeavier = primaryCount >= partnerCount;
+
+  // Boat tilt: negative = tilt left (primary heavier), positive = tilt right (partner heavier)
+  const tiltMagnitude = maxCount > 0 ? Math.abs(primaryCount - partnerCount) / maxCount : 0;
+  const boatTilt = imbalanced ? (primaryIsHeavier ? -tiltMagnitude : tiltMagnitude) : 0;
 
   // Colours: teal when balanced/lighter, warm amber when heavier + imbalanced
   const primaryColor =
@@ -238,7 +305,9 @@ export default function LoadScoreBar() {
     imbalanced,
     primary?.member.displayName ?? "Person 1",
     partner?.member.displayName ?? "Person 2",
-    primaryIsHeavier
+    primaryIsHeavier,
+    primaryCount,
+    partnerCount
   );
 
   async function saveThreshold() {
@@ -262,22 +331,22 @@ export default function LoadScoreBar() {
           className={`px-5 pt-5 pb-5 relative overflow-hidden ${
             imbalanced
               ? "bg-gradient-to-br from-orange-50 via-amber-50/80 to-orange-50/60"
-              : "bg-gradient-to-br from-teal-50/80 via-white/70 to-emerald-50/60"
+              : "bg-gradient-to-br from-sky-50/80 via-white/70 to-teal-50/60"
           }`}
         >
-          {/* Decorative blob */}
+          {/* Decorative water shimmer blob */}
           <div
             aria-hidden
             className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-20 pointer-events-none"
             style={{
               background: imbalanced
                 ? "radial-gradient(circle, oklch(0.75 0.15 50) 0%, transparent 70%)"
-                : "radial-gradient(circle, oklch(0.70 0.12 185) 0%, transparent 70%)",
+                : "radial-gradient(circle, oklch(0.70 0.12 210) 0%, transparent 70%)",
             }}
           />
 
           {/* Header row */}
-          <div className="flex items-center justify-between mb-5 relative">
+          <div className="flex items-center justify-between mb-4 relative">
             <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Mental Load
             </span>
@@ -290,12 +359,16 @@ export default function LoadScoreBar() {
             </button>
           </div>
 
-          {/* Botanical rings row */}
+          {/* Centre boat illustration */}
+          <div className="flex justify-center mb-4 relative">
+            <BoatSVG tilt={boatTilt} imbalanced={imbalanced} />
+          </div>
+
+          {/* Member rings row */}
           <div className="flex items-end justify-around gap-4 mb-5 relative">
             {/* Primary */}
             <div className="flex flex-col items-center gap-2">
               <GrowthRing fill={primaryFill} color={primaryColor} size={84}>
-                {/* Avatar or plant */}
                 <div className="flex flex-col items-center justify-center">
                   {(primary?.member as any)?.avatarUrl ? (
                     <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/60 shadow-sm">
@@ -306,7 +379,7 @@ export default function LoadScoreBar() {
                       />
                     </div>
                   ) : (
-                    <PlantSVG load={primaryLoad} color={primaryColor} />
+                    <CrateSVG crateCount={primaryCrates} color={primaryColor} />
                   )}
                 </div>
               </GrowthRing>
@@ -320,10 +393,10 @@ export default function LoadScoreBar() {
               </div>
             </div>
 
-            {/* Centre divider with leaf motif */}
+            {/* Centre divider with anchor motif */}
             <div className="flex flex-col items-center gap-1 pb-7 shrink-0 opacity-30">
               <div className="w-px h-5 bg-border" />
-              <span className="text-base">🌿</span>
+              <span className="text-base">⚓</span>
               <div className="w-px h-5 bg-border" />
             </div>
 
@@ -340,7 +413,7 @@ export default function LoadScoreBar() {
                       />
                     </div>
                   ) : (
-                    <PlantSVG load={partnerLoad} color={partnerColor} />
+                    <CrateSVG crateCount={partnerCrates} color={partnerColor} />
                   )}
                 </div>
               </GrowthRing>
@@ -360,13 +433,13 @@ export default function LoadScoreBar() {
             className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl ${
               imbalanced
                 ? "bg-orange-100/60 border border-orange-200/50"
-                : "bg-white/50 border border-teal-100/60"
+                : "bg-white/50 border border-sky-100/60"
             }`}
           >
             <span className="text-sm leading-none mt-0.5 shrink-0">{sentence.icon}</span>
             <p
               className={`text-xs leading-relaxed ${
-                imbalanced ? "text-orange-700" : "text-teal-700"
+                imbalanced ? "text-orange-700" : "text-sky-700"
               }`}
             >
               {sentence.text}

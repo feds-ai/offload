@@ -157,3 +157,10 @@
 
 ## Phase 25: Modal Reclassification
 - [x] Add per-item reclassification in TaskProcessingModal: event cards get "Move to tasks" button; task cards get "Move to calendar" button, with state updates so corrected items save to the right destination
+
+## Phase 26: Boat Theme Redesign
+- [x] LoadScoreBar: replace plant illustration with tilting SVG boat on water (tilt proportional to imbalance, calm water when balanced, choppy when imbalanced)
+- [x] LoadScoreBar: replace plant icons in member circles with cargo/crate SVG icons (more crates as tasks increase)
+- [x] LoadScoreBar: replace plant-themed status messages with boat-themed equivalents
+- [x] Empty state: replace plant illustration with calm water boat SVG, change "All clear!" to "Calm waters!"
+- [x] App icon: update to incorporate subtle boat/wave motif
