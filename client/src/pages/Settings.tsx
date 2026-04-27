@@ -11,7 +11,6 @@ import { toast } from "sonner";
 import {
   ArrowLeft,
   Trash2,
-  RotateCcw,
   Calendar,
   Scale,
   Route,
@@ -132,20 +131,6 @@ export default function Settings() {
       toast.success("Routing rule removed.");
     },
     onError: () => toast.error("Failed to remove rule."),
-  });
-
-  // ─── Dismissed inference types ──────────────────────────────────────────────
-  const { data: dismissed, refetch: refetchDismissed } = trpc.routing.getDismissed.useQuery(
-    { token: token ?? "" },
-    { enabled: !!token }
-  );
-
-  const restoreMutation = trpc.routing.restore.useMutation({
-    onSuccess: () => {
-      refetchDismissed();
-      toast.success("Suggestion type re-enabled.");
-    },
-    onError: () => toast.error("Failed to restore suggestion type."),
   });
 
   // ─── Imbalance threshold ────────────────────────────────────────────────────
@@ -441,46 +426,6 @@ export default function Settings() {
                   </div>
                 );
               })
-            )}
-          </div>
-        </section>
-
-        <Separator />
-
-        {/* ─── Dismissed Suggestion Types ───────────────────────────────────── */}
-        <section>
-          <div className="section-label mb-3">
-            <RefreshCw className="h-3.5 w-3.5 text-primary" />
-            Dismissed Suggestions
-          </div>
-          <div className="card-glass rounded-2xl divide-y divide-border/40">
-            {!dismissed || dismissed.length === 0 ? (
-              <div className="p-4 text-sm text-muted-foreground text-center">
-                No dismissed suggestion types. When you dismiss a suggestion three times, it'll appear here so you can re-enable it.
-              </div>
-            ) : (
-              dismissed.map((d: any) => (
-                <div key={d.inferenceType} className="flex items-center justify-between p-3 gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{d.label}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Dismissed {d.dismissCount} time{d.dismissCount !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 gap-1.5"
-                    onClick={() =>
-                      restoreMutation.mutate({ token: token!, inferenceType: d.inferenceType })
-                    }
-                    disabled={restoreMutation.isPending}
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                    Re-enable
-                  </Button>
-                </div>
-              ))
             )}
           </div>
         </section>

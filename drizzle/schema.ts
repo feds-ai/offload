@@ -139,3 +139,20 @@ export const tasks = mysqlTable("tasks", {
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = typeof tasks.$inferInsert;
+
+// ─── Responsibilities ─────────────────────────────────────────────────────────
+// Permanent mental-load items that always weigh on an owner.
+// They are never "completed" — they exist as long as someone owns them.
+
+export const responsibilities = mysqlTable("responsibilities", {
+  id: int("id").autoincrement().primaryKey(),
+  householdId: int("householdId").notNull(),
+  ownerMemberId: int("ownerMemberId").notNull(),
+  title: varchar("title", { length: 512 }).notNull(),
+  category: varchar("category", { length: 64 }).notNull().default("general"),
+  source: mysqlEnum("source", ["rhythm", "manual"]).default("manual").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Responsibility = typeof responsibilities.$inferSelect;
+export type InsertResponsibility = typeof responsibilities.$inferInsert;

@@ -9,6 +9,9 @@ import {
   createHouseholdMember,
   createRoutingRule,
   createTask,
+  createResponsibility,
+  deleteResponsibility,
+  deleteResponsibilitiesBySource,
   deleteRoutingRule,
   deleteTask,
   dismissInferenceType,
@@ -18,6 +21,7 @@ import {
   getHouseholdByToken,
   getMemberById,
   getMembersByHousehold,
+  getResponsibilitiesByHousehold,
   getRoutingRules,
   getTasksByHousehold,
   getTasksByMember,
@@ -643,12 +647,16 @@ export const appRouter = router({
         const household = await requireHousehold(input.token);
         const members = await getMembersByHousehold(household.id);
         const allTasks = await getTasksByHousehold(household.id);
+        const allResponsibilities = await getResponsibilitiesByHousehold(household.id);
 
         const scores = members.map((m) => {
           const memberTasks = allTasks.filter((t) => t.ownerMemberId === m.id);
           const openCount = memberTasks.filter((t) => t.status === "open").length;
-          const score = computeLoadScore(memberTasks);
-          return { member: m, openCount, score };
+          const taskScore = computeLoadScore(memberTasks);
+          // Each responsibility adds 1 point of constant background load
+          const responsibilityCount = allResponsibilities.filter((r) => r.ownerMemberId === m.id).length;
+          const score = taskScore + responsibilityCount;
+          return { member: m, openCount, score, responsibilityCount };
         });
 
         const totalScore = scores.reduce((s, m) => s + m.score, 0);
@@ -703,7 +711,205 @@ export const appRouter = router({
           partner?.displayName ?? input.partnerName
         );
         await upsertHouseholdRhythm(household.id, input.rawText, structured);
+        // Auto-regenerate rhythm-sourced responsibilities whenever rhythm is updated
+        if (primary && partner) {
+          try {
+            const { invokeLLM } = await import("./_core/llm");
+            const res = await invokeLLM({
+              messages: [
+                {
+                  role: "system",
+                  content: `You extract recurring household responsibilities from a weekly rhythm description.
+Return a JSON array of objects with: { owner: "${primary.displayName}" | "${partner.displayName}", title: string, category: string }.
+Each item should be a concise, always-present responsibility (e.g. "School run", "Taekwondo drop-off", "Weekly grocery shop").
+Do NOT include one-off tasks. Keep titles short (max 6 words). Category should be one of: childcare, transport, admin, health, home, food, finance, social, other.`,
+                },
+                { role: "user", content: input.rawText },
+              ],
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: "responsibilities",
+                  strict: true,
+                  schema: {
+                    type: "object",
+                    properties: {
+                      items: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            owner: { type: "string" },
+                            title: { type: "string" },
+                            category: { type: "string" },
+                          },
+                          required: ["owner", "title", "category"],
+                          additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ["items"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+            });
+            const parsed = JSON.parse(res.choices[0].message.content as string);
+            const items: Array<{ owner: string; title: string; category: string }> = parsed.items ?? [];
+            await deleteResponsibilitiesBySource(household.id, "rhythm");
+            for (const item of items) {
+              const ownerMember =
+                item.owner === primary.displayName ? primary :
+                item.owner === partner.displayName ? partner : null;
+              if (!ownerMember) continue;
+              await createResponsibility({
+                householdId: household.id,
+                ownerMemberId: ownerMember.id,
+                title: item.title,
+                category: item.category,
+                source: "rhythm",
+              });
+            }
+          } catch (e) {
+            console.warn("[Responsibilities] Auto-sync from rhythm failed (non-fatal):", e);
+          }
+        }
         return { structured };
+      }),
+  }),
+
+  // ─── Responsibilities ────────────────────────────────────────────────────────
+
+  responsibilities: router({
+    list: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        return getResponsibilitiesByHousehold(household.id);
+      }),
+
+    add: publicProcedure
+      .input(
+        z.object({
+          token: z.string(),
+          ownerMemberId: z.number(),
+          title: z.string().min(1),
+          category: z.string().default("general"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const members = await getMembersByHousehold(household.id);
+        if (!members.find((m) => m.id === input.ownerMemberId)) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+        }
+        return createResponsibility({
+          householdId: household.id,
+          ownerMemberId: input.ownerMemberId,
+          title: input.title,
+          category: input.category,
+          source: "manual",
+        });
+      }),
+
+    delete: publicProcedure
+      .input(z.object({ token: z.string(), id: z.number() }))
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const all = await getResponsibilitiesByHousehold(household.id);
+        if (!all.find((r) => r.id === input.id)) {
+          throw new TRPCError({ code: "NOT_FOUND" });
+        }
+        await deleteResponsibility(input.id);
+        return { success: true };
+      }),
+
+    // Regenerate rhythm-sourced responsibilities from the current household rhythm
+    syncFromRhythm: publicProcedure
+      .input(
+        z.object({
+          token: z.string(),
+          primaryName: z.string(),
+          partnerName: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const household = await requireHousehold(input.token);
+        const rhythm = await getHouseholdRhythm(household.id);
+        if (!rhythm?.rawText) return { added: 0 };
+        const members = await getMembersByHousehold(household.id);
+        const primary = members.find((m) => m.role === "primary");
+        const partner = members.find((m) => m.role === "partner");
+        if (!primary || !partner) return { added: 0 };
+
+        // Ask the LLM to extract recurring responsibilities from the rhythm text
+        const { invokeLLM } = await import("./_core/llm");
+        const res = await invokeLLM({
+          messages: [
+            {
+              role: "system",
+              content: `You extract recurring household responsibilities from a weekly rhythm description.
+Return a JSON array of objects with: { owner: "${primary.displayName}" | "${partner.displayName}", title: string, category: string }.
+Each item should be a concise, always-present responsibility (e.g. "School run", "Taekwondo drop-off", "Weekly grocery shop").
+Do NOT include one-off tasks. Keep titles short (max 6 words). Category should be one of: childcare, transport, admin, health, home, food, finance, social, other.`,
+            },
+            { role: "user", content: rhythm.rawText },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "responsibilities",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  items: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        owner: { type: "string" },
+                        title: { type: "string" },
+                        category: { type: "string" },
+                      },
+                      required: ["owner", "title", "category"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["items"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+
+        let items: Array<{ owner: string; title: string; category: string }> = [];
+        try {
+          const parsed = JSON.parse(res.choices[0].message.content as string);
+          items = parsed.items ?? [];
+        } catch {
+          return { added: 0 };
+        }
+
+        // Replace all rhythm-sourced responsibilities
+        await deleteResponsibilitiesBySource(household.id, "rhythm");
+        let added = 0;
+        for (const item of items) {
+          const ownerMember =
+            item.owner === primary.displayName ? primary :
+            item.owner === partner.displayName ? partner : null;
+          if (!ownerMember) continue;
+          await createResponsibility({
+            householdId: household.id,
+            ownerMemberId: ownerMember.id,
+            title: item.title,
+            category: item.category,
+            source: "rhythm",
+          });
+          added++;
+        }
+        return { added };
       }),
   }),
 

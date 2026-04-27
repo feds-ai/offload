@@ -189,3 +189,9 @@
 - [x] Add per-member ConnectCalendarButton component that fetches its own auth URL with correct memberId in state
 - [x] Add error logging to exchangeCodeForTokens for easier future debugging
 - [x] Settings now invalidates household.getByToken on mount and on calendarConnected redirect
+
+## Phase 31: UX Improvements (QA feedback)
+- [x] Dismissed suggestions: remove the section from Settings entirely — it's noisy and not useful as a permanent list. Keep the dismissal learning logic but don't surface it in Settings.
+- [x] Add "Responsibilities" concept: permanent/recurring mental load items that always weigh on an owner (not completable tasks). New DB table: responsibilities. Shown on Dashboard in a separate collapsible section per person. Counted in load score.
+- [x] Auto-generate responsibilities from household rhythm when rhythm is saved (AI extracts recurring activities per person as responsibilities).
+- [x] Allow manual add/remove of responsibilities from Dashboard or Settings.

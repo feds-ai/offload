@@ -6,8 +6,10 @@ import {
   householdMembers,
   householdRhythm,
   households,
+  InsertResponsibility,
   InsertTask,
   InsertUser,
+  responsibilities,
   routingRules,
   tasks,
   users,
@@ -396,4 +398,43 @@ export function computeLoadScore(memberTasks: Array<{ urgency: string; status: s
   return memberTasks
     .filter((t) => t.status === "open")
     .reduce((sum, t) => sum + (URGENCY_WEIGHTS[t.urgency as keyof typeof URGENCY_WEIGHTS] ?? 1), 0);
+}
+
+// ─── Responsibilities ─────────────────────────────────────────────────────────
+
+export async function getResponsibilitiesByHousehold(householdId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(responsibilities)
+    .where(eq(responsibilities.householdId, householdId))
+    .orderBy(responsibilities.ownerMemberId, responsibilities.createdAt);
+}
+
+export async function createResponsibility(data: InsertResponsibility) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.insert(responsibilities).values(data);
+  const result = await db
+    .select()
+    .from(responsibilities)
+    .where(eq(responsibilities.householdId, data.householdId))
+    .orderBy(desc(responsibilities.createdAt))
+    .limit(1);
+  return result[0];
+}
+
+export async function deleteResponsibility(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.delete(responsibilities).where(eq(responsibilities.id, id));
+}
+
+export async function deleteResponsibilitiesBySource(householdId: number, source: "rhythm" | "manual") {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .delete(responsibilities)
+    .where(and(eq(responsibilities.householdId, householdId), eq(responsibilities.source, source)));
 }

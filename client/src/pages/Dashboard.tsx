@@ -5,6 +5,7 @@ import { useHousehold } from "@/contexts/HouseholdContext";
 import InputBar from "@/components/InputBar";
 import TaskCard from "@/components/TaskCard";
 import LoadScoreBar from "@/components/LoadScoreBar";
+import ResponsibilitiesPanel from "@/components/ResponsibilitiesPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -207,6 +208,9 @@ export default function Dashboard() {
       <main className="relative z-10 max-w-2xl mx-auto px-4 py-5 space-y-5">
         {/* Load score */}
         <LoadScoreBar />
+
+        {/* Ongoing responsibilities */}
+        <ResponsibilitiesPanel />
 
         {/* View tabs */}
         <Tabs value={view} onValueChange={(v) => setView(v as TaskView)}>
