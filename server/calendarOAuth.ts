@@ -35,10 +35,14 @@ export function registerCalendarOAuthRoutes(app: Express) {
     let token: string;
     let memberId: number;
 
+    let redirectUri: string;
     try {
-      const parsed = JSON.parse(decodeURIComponent(state)) as { token: string; memberId: number };
+      const parsed = JSON.parse(decodeURIComponent(state)) as { token: string; memberId: number; redirectUri?: string };
       token = parsed.token;
       memberId = parsed.memberId;
+      // Use the exact redirectUri that was sent to Google (stored in state).
+      // Falling back to req-based construction only if not present (old links).
+      redirectUri = parsed.redirectUri ?? `${req.protocol}://${req.get("host")}/api/calendar/callback`;
     } catch {
       res.redirect("/?calendarError=invalid_state");
       return;
@@ -60,8 +64,7 @@ export function registerCalendarOAuthRoutes(app: Express) {
         return;
       }
 
-      // Exchange code for tokens
-      const redirectUri = `${req.protocol}://${req.get("host")}/api/calendar/callback`;
+      // Exchange code for tokens using the same redirectUri Google received
       const tokenData = await exchangeCodeForTokens(code, redirectUri);
       if (!tokenData) {
         res.redirect("/settings?calendarError=token_exchange_failed");

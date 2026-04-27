@@ -31,6 +31,37 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// ─── Per-member Connect Calendar button ─────────────────────────────────────
+// Fetches its own auth URL with the correct memberId baked into the state param.
+function ConnectCalendarButton({
+  token,
+  memberId,
+  redirectUri,
+  configured,
+}: {
+  token: string;
+  memberId: number;
+  redirectUri: string;
+  configured: boolean;
+}) {
+  const { data } = trpc.calendar.getAuthUrl.useQuery(
+    { token, redirectUri, memberId },
+    { enabled: configured && !!token && memberId > 0 }
+  );
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={!data?.url}
+      onClick={() => {
+        if (data?.url) window.location.href = data.url;
+      }}
+    >
+      Connect
+    </Button>
+  );
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   school: "School",
   medical: "Medical",
@@ -166,23 +197,37 @@ export default function Settings() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("calendarConnected") === "true") {
+      // Invalidate household query so members list re-fetches with updated googleCalendarToken
+      utils.household.getByToken.invalidate();
       toast.success("Google Calendar connected!", {
         description: "Events and task reminders will now be added to your calendar automatically.",
       });
       window.history.replaceState({}, "", "/settings");
     } else if (params.get("calendarError")) {
+      const errCode = params.get("calendarError");
       toast.error("Google Calendar connection failed", {
-        description: "Please try again. If the problem persists, check your credentials in Settings → Secrets.",
+        description: `Error: ${errCode}. Please try again.`,
       });
       window.history.replaceState({}, "", "/settings");
     }
-  }, []);
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Google Calendar ────────────────────────────────────────────────────────
+  // We need a stable memberId for the getAuthUrl query. We use myMemberId if available,
+  // otherwise fall back to the first member. The actual per-member URL is built in the
+  // Connect button click handler below.
+  const firstMemberId = members[0]?.id ?? 0;
   const { data: calendarAuthData } = trpc.calendar.getAuthUrl.useQuery(
-    { token: token ?? "", redirectUri: `${window.location.origin}/api/calendar/callback` },
-    { enabled: !!token }
+    { token: token ?? "", redirectUri: `${window.location.origin}/api/calendar/callback`, memberId: firstMemberId },
+    { enabled: !!token && firstMemberId > 0 }
   );
+
+  // Refresh household data when Settings mounts (handles post-OAuth redirect case)
+  useEffect(() => {
+    if (token) {
+      utils.household.getByToken.invalidate();
+    }
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!token) {
     return (
@@ -512,18 +557,12 @@ export default function Settings() {
                         </p>
                       </div>
                       {!m.googleCalendarToken && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            if (calendarAuthData?.url) {
-                              localStorage.setItem("offload_calendar_member_id", String(m.id));
-                              window.location.href = calendarAuthData.url;
-                            }
-                          }}
-                        >
-                          Connect
-                        </Button>
+                        <ConnectCalendarButton
+                          token={token!}
+                          memberId={m.id}
+                          redirectUri={`${window.location.origin}/api/calendar/callback`}
+                          configured={calendarAuthData?.configured ?? false}
+                        />
                       )}
                       {m.googleCalendarToken && (
                         <Badge variant="secondary" className="text-xs text-emerald-700 bg-emerald-50">

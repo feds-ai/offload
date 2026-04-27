@@ -181,3 +181,11 @@
 
 ## Phase 29: Bug Fixes
 - [x] Fix Google Calendar OAuth 404: align redirect URI in calendarOAuth.ts to use /api/calendar/callback (not /calendar-callback)
+
+## Phase 30: Google Calendar Connection Status Fix
+- [x] Fix: getAuthUrl was not including state param (token + memberId) in Google OAuth URL — callback couldn't identify which member to save the token for
+- [x] Fix: calendarOAuth.ts was building redirectUri from req.protocol+host (internal container URL) instead of the public domain — token exchange was failing with redirect_uri_mismatch
+- [x] Fix: Settings page was not invalidating household query after OAuth redirect — stale members data showed "not connected" even after successful token save
+- [x] Add per-member ConnectCalendarButton component that fetches its own auth URL with correct memberId in state
+- [x] Add error logging to exchangeCodeForTokens for easier future debugging
+- [x] Settings now invalidates household.getByToken on mount and on calendarConnected redirect

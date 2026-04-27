@@ -719,13 +719,20 @@ export const appRouter = router({
       }),
 
     getAuthUrl: publicProcedure
-      .input(z.object({ token: z.string(), redirectUri: z.string() }))
+      .input(z.object({ token: z.string(), redirectUri: z.string(), memberId: z.number() }))
       .query(async ({ input }) => {
         await requireHousehold(input.token);
         const clientId = ENV.googleClientId;
         if (!clientId) {
           return { url: null, configured: false };
         }
+        // Encode token + memberId + redirectUri in state so the callback can verify identity
+        // and use the exact same redirectUri for the token exchange.
+        const state = encodeURIComponent(JSON.stringify({
+          token: input.token,
+          memberId: input.memberId,
+          redirectUri: input.redirectUri,
+        }));
         const params = new URLSearchParams({
           client_id: clientId,
           redirect_uri: input.redirectUri,
@@ -733,6 +740,7 @@ export const appRouter = router({
           scope: "https://www.googleapis.com/auth/calendar.events",
           access_type: "offline",
           prompt: "consent",
+          state,
         });
         return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params}`, configured: true };
       }),

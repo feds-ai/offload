@@ -62,8 +62,16 @@ export async function exchangeCodeForTokens(
     }),
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "(unreadable)");
+    console.error("[Calendar] exchangeCodeForTokens failed:", res.status, errText);
+    return null;
+  }
   const data = await res.json() as any;
+  if (!data.access_token) {
+    console.error("[Calendar] exchangeCodeForTokens: no access_token in response", JSON.stringify(data));
+    return null;
+  }
   return {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
