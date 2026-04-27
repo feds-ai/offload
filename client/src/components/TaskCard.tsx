@@ -55,6 +55,7 @@ interface Task {
 interface TaskCardProps {
   task: Task;
   onRefresh: () => void;
+  onReassign?: () => void;
 }
 
 const URGENCY_LEFT_BORDER: Record<string, string> = {
@@ -108,7 +109,7 @@ function ownerInitials(name: string) {
     .slice(0, 2);
 }
 
-export default function TaskCard({ task, onRefresh }: TaskCardProps) {
+export default function TaskCard({ task, onRefresh, onReassign }: TaskCardProps) {
   const { members, token } = useHousehold();
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
@@ -178,7 +179,8 @@ export default function TaskCard({ task, onRefresh }: TaskCardProps) {
       token: token ?? "",
       ownerMemberId: otherMember.id,
     });
-    toast.success(`Reassigned to ${otherMember.displayName}`);
+    toast.success(`Offloaded to ${otherMember.displayName} — check the Household tab`);
+    onReassign?.();
   }
 
   async function setUrgencyHigh() {

@@ -199,3 +199,6 @@
 ## Phase 32: QA fixes
 - [x] Responsibilities should count toward BOTH members' load (they are shared household burdens), not just the owner's score
 - [x] Fix: offloading a task to partner does not create a Google Calendar event for the new owner
+
+## Phase 33: Bug fix
+- [x] Task disappears from the list after being offloaded (reassigned) to partner

@@ -87,6 +87,11 @@ export default function Dashboard() {
     setInputOpen(false);
   }
 
+  function handleReassign() {
+    refetchAll();
+    setView("household");
+  }
+
   function copyShareLink() {
     if (!household) return;
     const url = `${window.location.origin}/shared/${household.shareToken}`;
@@ -250,7 +255,7 @@ export default function Dashboard() {
                 </div>
                 <div className="space-y-2">
                   {visibleOpen.map((task: Task) => (
-                    <TaskCard key={task.id} task={task} onRefresh={handleRefresh} />
+                    <TaskCard key={task.id} task={task} onRefresh={handleRefresh} onReassign={handleReassign} />
                   ))}
                 </div>
               </section>
@@ -264,7 +269,7 @@ export default function Dashboard() {
                 </div>
                 <div className="space-y-2">
                   {visibleSnoozed.map((task: Task) => (
-                    <TaskCard key={task.id} task={task} onRefresh={handleRefresh} />
+                    <TaskCard key={task.id} task={task} onRefresh={handleRefresh} onReassign={handleReassign} />
                   ))}
                 </div>
               </section>
@@ -278,7 +283,7 @@ export default function Dashboard() {
                 </div>
                 <div className="space-y-2">
                   {visibleDone.map((task: Task) => (
-                    <TaskCard key={task.id} task={task} onRefresh={handleRefresh} />
+                    <TaskCard key={task.id} task={task} onRefresh={handleRefresh} onReassign={handleReassign} />
                   ))}
                 </div>
               </section>

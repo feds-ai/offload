@@ -78,6 +78,12 @@ export default function SharedView() {
     setInputOpen(false);
   }
 
+  function handleReassign() {
+    setRefreshKey((k) => k + 1);
+    refetchAll();
+    setView("household");
+  }
+
   const myMember = members.find((m) => m.id === myMemberId);
   const partnerMember = members.find((m) => m.id !== myMemberId);
 
@@ -242,11 +248,12 @@ export default function SharedView() {
                 </div>
                 <div className="space-y-2">
                   {visibleOpen.map((task: Task) => (
-                    <TaskCard key={task.id} task={task} onRefresh={handleRefresh} />
+                     <TaskCard key={task.id} task={task} onRefresh={handleRefresh} onReassign={handleReassign} />
                   ))}
                 </div>
               </section>
             )}
+
             {visibleSnoozed.length > 0 && (
               <section className="space-y-2.5">
                 <div className="section-label">
@@ -255,11 +262,12 @@ export default function SharedView() {
                 </div>
                 <div className="space-y-2">
                   {visibleSnoozed.map((task: Task) => (
-                    <TaskCard key={task.id} task={task} onRefresh={handleRefresh} />
+                     <TaskCard key={task.id} task={task} onRefresh={handleRefresh} onReassign={handleReassign} />
                   ))}
                 </div>
               </section>
             )}
+
             {visibleDone.length > 0 && (
               <section className="space-y-2.5">
                 <div className="section-label">
@@ -268,11 +276,12 @@ export default function SharedView() {
                 </div>
                 <div className="space-y-2">
                   {visibleDone.map((task: Task) => (
-                    <TaskCard key={task.id} task={task} onRefresh={handleRefresh} />
+                     <TaskCard key={task.id} task={task} onRefresh={handleRefresh} onReassign={handleReassign} />
                   ))}
                 </div>
               </section>
             )}
+
             {visibleOpen.length === 0 && visibleSnoozed.length === 0 && visibleDone.length === 0 && (
               <div className="text-center py-16 space-y-3">
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white/70 shadow-sm border border-border/50 text-4xl backdrop-blur-sm">
