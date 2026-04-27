@@ -3,6 +3,7 @@
  * Uses the Google Calendar REST API directly (no SDK needed).
  * Tokens are stored as JSON in householdMembers.googleCalendarToken.
  */
+import { ENV } from "./_core/env";
 
 interface TokenData {
   access_token: string;
@@ -14,8 +15,8 @@ interface TokenData {
  * Refresh an access token using the refresh_token.
  */
 async function refreshAccessToken(refreshToken: string): Promise<TokenData | null> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const clientId = ENV.googleClientId;
+  const clientSecret = ENV.googleClientSecret;
   if (!clientId || !clientSecret) return null;
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
@@ -45,8 +46,8 @@ export async function exchangeCodeForTokens(
   code: string,
   redirectUri: string
 ): Promise<TokenData | null> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const clientId = ENV.googleClientId;
+  const clientSecret = ENV.googleClientSecret;
   if (!clientId || !clientSecret) return null;
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
@@ -182,5 +183,5 @@ export async function deleteCalendarEvent(
  * Check if Google Calendar is configured (env vars present).
  */
 export function isCalendarConfigured(): boolean {
-  return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  return !!(ENV.googleClientId && ENV.googleClientSecret);
 }

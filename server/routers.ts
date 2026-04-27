@@ -38,6 +38,7 @@ import {
   suggestRouting,
   transcribeVoiceNote,
 } from "./ai";
+import { ENV } from "./_core/env";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
@@ -721,7 +722,7 @@ export const appRouter = router({
       .input(z.object({ token: z.string(), redirectUri: z.string() }))
       .query(async ({ input }) => {
         await requireHousehold(input.token);
-        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientId = ENV.googleClientId;
         if (!clientId) {
           return { url: null, configured: false };
         }
