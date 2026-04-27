@@ -86,9 +86,9 @@ function BoatSVG({ tilt, imbalanced }: { tilt: number; imbalanced: boolean }) {
 
   return (
     <svg
-      viewBox="0 0 120 80"
-      width="120"
-      height="80"
+      viewBox="0 0 160 110"
+      width="160"
+      height="110"
       aria-hidden
       style={{ overflow: "visible" }}
     >
@@ -97,12 +97,12 @@ function BoatSVG({ tilt, imbalanced }: { tilt: number; imbalanced: boolean }) {
         // Choppy water — multiple small waves
         <>
           <path
-            d="M0 58 Q10 53 20 58 Q30 63 40 58 Q50 53 60 58 Q70 63 80 58 Q90 53 100 58 Q110 63 120 58 L120 80 L0 80 Z"
+            d="M0 78 Q13 71 27 78 Q40 85 53 78 Q67 71 80 78 Q93 85 107 78 Q120 71 133 78 Q147 85 160 78 L160 110 L0 110 Z"
             fill={waterColor}
             opacity={waterOpacity}
           />
           <path
-            d="M0 62 Q15 57 30 62 Q45 67 60 62 Q75 57 90 62 Q105 67 120 62 L120 80 L0 80 Z"
+            d="M0 84 Q20 77 40 84 Q60 91 80 84 Q100 77 120 84 Q140 91 160 84 L160 110 L0 110 Z"
             fill={waterColor}
             opacity={waterOpacity * 0.6}
           />
@@ -111,12 +111,12 @@ function BoatSVG({ tilt, imbalanced }: { tilt: number; imbalanced: boolean }) {
         // Calm water — gentle single wave
         <>
           <path
-            d="M0 60 Q30 55 60 60 Q90 65 120 60 L120 80 L0 80 Z"
+            d="M0 80 Q40 73 80 80 Q120 87 160 80 L160 110 L0 110 Z"
             fill={waterColor}
             opacity={waterOpacity}
           />
           <path
-            d="M0 65 Q30 61 60 65 Q90 69 120 65 L120 80 L0 80 Z"
+            d="M0 87 Q40 83 80 87 Q120 91 160 87 L160 110 L0 110 Z"
             fill={waterColor}
             opacity={waterOpacity * 0.5}
           />
@@ -125,41 +125,41 @@ function BoatSVG({ tilt, imbalanced }: { tilt: number; imbalanced: boolean }) {
 
       {/* Boat group — rotates around the waterline centre */}
       <g
-        transform={`translate(60, 58) rotate(${angleDeg}) translate(-60, -58)`}
+        transform={`translate(80, 78) rotate(${angleDeg}) translate(-80, -78)`}
         style={{ transition: "transform 1s ease-out" }}
       >
         {/* Hull */}
         <path
-          d="M30 58 Q35 68 60 70 Q85 68 90 58 Z"
+          d="M44 78 Q50 92 80 95 Q110 92 116 78 Z"
           fill="oklch(0.55 0.09 40)"
           opacity={0.9}
         />
         {/* Hull highlight */}
         <path
-          d="M35 58 Q40 65 60 67 Q80 65 85 58 Z"
+          d="M50 78 Q56 88 80 91 Q104 88 110 78 Z"
           fill="white"
           opacity={0.15}
         />
         {/* Deck */}
-        <rect x="32" y="52" width="56" height="7" rx="2" fill="oklch(0.65 0.09 45)" opacity={0.95} />
+        <rect x="46" y="69" width="68" height="10" rx="3" fill="oklch(0.65 0.09 45)" opacity={0.95} />
         {/* Cabin */}
-        <rect x="46" y="42" width="28" height="11" rx="3" fill="white" opacity={0.85} />
+        <rect x="60" y="55" width="40" height="15" rx="4" fill="white" opacity={0.85} />
         {/* Cabin window */}
-        <rect x="52" y="45" width="7" height="5" rx="1.5" fill="oklch(0.62 0.10 195)" opacity={0.6} />
-        <rect x="62" y="45" width="7" height="5" rx="1.5" fill="oklch(0.62 0.10 195)" opacity={0.6} />
+        <rect x="66" y="59" width="10" height="7" rx="2" fill="oklch(0.62 0.10 195)" opacity={0.6} />
+        <rect x="80" y="59" width="10" height="7" rx="2" fill="oklch(0.62 0.10 195)" opacity={0.6} />
         {/* Mast */}
-        <line x1="60" y1="42" x2="60" y2="20" stroke="oklch(0.45 0.07 40)" strokeWidth="2" strokeLinecap="round" />
+        <line x1="80" y1="55" x2="80" y2="24" stroke="oklch(0.45 0.07 40)" strokeWidth="2.5" strokeLinecap="round" />
         {/* Flag / bunting */}
         <path
-          d="M60 20 L75 25 L60 30 Z"
+          d="M80 24 L100 31 L80 38 Z"
           fill="oklch(0.55 0.14 20)"
           opacity={0.85}
         />
         {/* Cargo crates on deck (more when imbalanced) */}
         {imbalanced && (
           <>
-            <rect x="34" y="46" width="8" height="7" rx="1" fill="oklch(0.55 0.09 40)" opacity={0.6} />
-            <rect x="78" y="46" width="8" height="7" rx="1" fill="oklch(0.55 0.09 40)" opacity={0.6} />
+            <rect x="48" y="60" width="11" height="10" rx="1.5" fill="oklch(0.55 0.09 40)" opacity={0.6} />
+            <rect x="101" y="60" width="11" height="10" rx="1.5" fill="oklch(0.55 0.09 40)" opacity={0.6} />
           </>
         )}
       </g>
