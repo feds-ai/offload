@@ -198,13 +198,12 @@ export default function Settings() {
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Google Calendar ────────────────────────────────────────────────────────
-  // We need a stable memberId for the getAuthUrl query. We use myMemberId if available,
-  // otherwise fall back to the first member. The actual per-member URL is built in the
-  // Connect button click handler below.
-  const firstMemberId = members[0]?.id ?? 0;
+  // Query getAuthUrl only to check if Google Calendar is configured (clientId present).
+  // We use the first real member ID — only fires once members have loaded.
+  const firstMemberId = members[0]?.id;
   const { data: calendarAuthData } = trpc.calendar.getAuthUrl.useQuery(
-    { token: token ?? "", redirectUri: `${window.location.origin}/api/calendar/callback`, memberId: firstMemberId },
-    { enabled: !!token && firstMemberId > 0 }
+    { token: token ?? "", redirectUri: `${window.location.origin}/api/calendar/callback`, memberId: firstMemberId ?? 1 },
+    { enabled: !!token && !!firstMemberId }
   );
 
   // Refresh household data when Settings mounts (handles post-OAuth redirect case)

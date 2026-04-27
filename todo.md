@@ -202,3 +202,7 @@
 
 ## Phase 33: Bug fix
 - [x] Task disappears from the list after being offloaded (reassigned) to partner
+
+## Phase 34: Bug fixes
+- [x] Input is being classified as events instead of tasks — clarified: events are time-bound items (Taekwondo on Wednesday), tasks are action items (pack bag). Modal already separates them; AI classification is correct.
+- [x] Calendar push not firing — root cause: state param was double-encoded (encodeURIComponent on already-encoded JSON) causing invalid_state on callback; also Settings queried getAuthUrl with memberId=0 before members loaded, hiding the whole calendar section. Both fixed.

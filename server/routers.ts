@@ -968,11 +968,11 @@ Do NOT include one-off tasks. Keep titles short (max 6 words). Category should b
         }
         // Encode token + memberId + redirectUri in state so the callback can verify identity
         // and use the exact same redirectUri for the token exchange.
-        const state = encodeURIComponent(JSON.stringify({
+        const state = JSON.stringify({
           token: input.token,
           memberId: input.memberId,
           redirectUri: input.redirectUri,
-        }));
+        });
         const params = new URLSearchParams({
           client_id: clientId,
           redirect_uri: input.redirectUri,
